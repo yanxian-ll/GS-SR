@@ -97,7 +97,7 @@ from gssr.scene.base_scene import SceneConfig
 class Config(PrintableConfig):
     """Full config contents"""
 
-    source_path: str = "/home/csuzhang/disk/test/scene"
+    source_path: Optional[str] = None
     output_path: str = "./output"
     method_name: Optional[str] = None # required
     experiment_name: Optional[str] = None

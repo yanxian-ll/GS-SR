@@ -158,14 +158,14 @@ If partitioning is required, we recommend using ```colmap model_orientation_alig
 
 ```bash
 
-python train_split.py -s ./test/scene1 -m ./output
+python train.py octree-2dgs --source-path ./test/scene1 --output-path ./output
 ```
 
 ### Extract Mesh
 
 ```bash
 
-python extract_mesh_split.py ./test/scene1 -m ./output
+python extract_mesh.py --load-config <path to config>
 ```
 
 ## Acknowledgements
