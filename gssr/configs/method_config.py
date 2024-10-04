@@ -52,7 +52,7 @@ descriptions = {
 
     "pgsr": "Implementation of PGSR",
     "scaffold-pgsr": "Implementation of Scafflod-GS + PGSR",
-    "octree-pgsr"  : "Implementation of OCtree-GS-GS + PGSR",
+    "octree-pgsr"  : "Implementation of Octree-GS + PGSR",
 }
 
 method_configs["3dgs"] = Config(
