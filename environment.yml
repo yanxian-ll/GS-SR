@@ -1,0 +1,35 @@
+name: gssr
+channels:
+  - pytorch
+  - pyg
+  - conda-forge
+  - defaults
+dependencies:
+  - cudatoolkit=11.8
+  - python=3.8.19
+  - pip=24.2
+  - pytorch=2.1.2
+  - torchaudio=2.1.2
+  - torchvision=0.16.2
+  - pytorch-scatter
+  - pip:
+    - plyfile
+    - tensorboard
+    - tqdm
+    - einops
+    - wandb
+    - lpips
+    - laspy
+    - jaxtyping
+    - colorama
+    - opencv-python
+    - sklearn
+    - trimesh
+    - open3d
+    - pytorch3d
+    - submodules/diff-gaussian-rasterization
+    - submodules/diff-plane-rasterization
+    - submodules/diff-surfel-rasterization
+    - submodules/scaffold-filter
+    - submodules/simple-knn
+    

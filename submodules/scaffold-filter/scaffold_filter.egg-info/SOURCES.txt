@@ -1,0 +1,12 @@
+LICENSE.md
+README.md
+ext.cpp
+rasterize_points.cu
+setup.py
+cuda_rasterizer/forward.cu
+cuda_rasterizer/rasterizer_impl.cu
+scaffold_filter/__init__.py
+scaffold_filter.egg-info/PKG-INFO
+scaffold_filter.egg-info/SOURCES.txt
+scaffold_filter.egg-info/dependency_links.txt
+scaffold_filter.egg-info/top_level.txt
