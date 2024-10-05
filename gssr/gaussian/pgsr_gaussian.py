@@ -15,6 +15,8 @@ class PGSRGaussianConfig(VanillaGaussianConfig):
     max_abs_split_points: int = 50_000
     max_all_points: int = 6000_000
 
+    percent_dense: float = 0.001
+
 
 class PGSRGaussian(VanillaGaussian):
     config: PGSRGaussianConfig
