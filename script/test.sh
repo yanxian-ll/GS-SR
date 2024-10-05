@@ -26,3 +26,8 @@ python train.py 2dgs --source-path ${source-path} --scene.depth-ratio 0 --scene.
 # pgsr
 python train.py pgsr --source-path ${source-path} --scene.gaussians.max-abs-split-points 0 --scene.gaussians.opacity_cull_threshold 0.05
 
+
+## mesh extraction
+config-file=""
+python extract_mesh.py --load-config ${config-file} --skip-train --skip-test --no-render-video --num-cluster 10
+
