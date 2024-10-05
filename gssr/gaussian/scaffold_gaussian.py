@@ -28,7 +28,7 @@ class ScaffoldGaussianConfig(VanillaGaussianConfig):
     n_offsets: int = 10
     voxel_size: float = 0.001  # if voxel_size<=0, using 1nn dist
     update_depth: int = 3
-    update_init_factor: int = 100
+    update_init_factor: int = 16
     update_hierachy_factor: int = 4
 
     start_stat: int = 500  # for anchor densification

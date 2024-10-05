@@ -1,8 +1,7 @@
 import torch.nn as nn
 import torch
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Type, Union, cast
-
+from typing import Dict
 
 from gssr.gaussian.vanilla_gaussian import VanillaGaussian, VanillaGaussianConfig, build_rotation
 from gssr.utils.graphics_utils import BasicPointCloud
@@ -11,6 +10,7 @@ from gssr.utils.graphics_utils import BasicPointCloud
 @dataclass
 class TwoDGaussianConfig(VanillaGaussianConfig):
     _target: type = field(default_factory=lambda: TwoDGaussian)
+    opacity_cull_threshold: float = 0.05
 
 class TwoDGaussian(VanillaGaussian):
     config: TwoDGaussianConfig

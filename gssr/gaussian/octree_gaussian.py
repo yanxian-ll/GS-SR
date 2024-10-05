@@ -29,8 +29,8 @@ class OctreeGaussianConfig(ScaffoldGaussianConfig):
     add_level: bool = False
     visible_threshold: float = -1
     dist2level: str = 'round'
-    base_layer: int = 10
-    progressive: bool = True
+    base_layer: int = -1  # -1(adaptive)
+    progressive: bool = False
     extend: float = 1.1
 
     dist_ratio: float = 0.999
