@@ -75,8 +75,8 @@ class MachineConfig(PrintableConfig):
 @dataclass
 class TrainerConfig(PrintableConfig):
     iterations: int = 30_000
-    test_iterations: List[int] = field(default_factory=lambda:[7_000, 30_000])
-    save_iterations: List[int] = field(default_factory=lambda:[7_000, 30_000])
+    test_iterations: List[int] = field(default_factory=lambda:[30_000])
+    save_iterations: List[int] = field(default_factory=lambda:[30_000])
     relative_gaussian_dir: Path = Path("point_cloud/")
 
     checkpoint_iterations: List[int] = field(default_factory=list)

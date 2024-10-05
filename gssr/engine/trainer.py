@@ -28,6 +28,7 @@ from gssr.configs import base_config as cfg
 from gssr.engine.callbacks import TrainingCallback, TrainingCallbackLocation
 from gssr.scene.base_scene import Scene
 from gssr.utils.tensorboard_utils import *
+from gssr.utils.image_utils import psnr
 
 CONSOLE = Console(width=120)
 
@@ -106,6 +107,9 @@ class Trainer:
                     progress_bar.close()
 
                 # TODO: Log and save
+                if (step in self.config.trainer.test_iterations):
+                    self.evaluation(step)
+
                 if (step in self.config.trainer.save_iterations):
                     self.save_gaussians(step)
                 write_scalar(self.tb_writer, "loss", loss, step)
@@ -127,6 +131,25 @@ class Trainer:
                 if (step in self.config.trainer.checkpoint_iterations):
                     CONSOLE.log(f"\n[ITER {step}] Saving Checkpoint.")
                     self.save_checkpoint(step)
+
+    @torch.no_grad()
+    def evaluation(self, step):
+        torch.cuda.empty_cache()
+        validation_configs = ({'name': 'test', 'cameras': self.scene.dataloader.getTestData()},
+                              {'name': 'train', 'cameras': self.scene.dataloader.getTrainData()})
+        for config in validation_configs:
+            if config['cameras'] and len(config['cameras']) > 0:
+                l1_test = 0.0
+                psnr_test = 0.0
+                for idx, viewpoint in enumerate(config['cameras']):
+                    image = torch.clamp(self.scene.eval_render(viewpoint)['render'], 0.0 ,1.0)
+                    gt_image = torch.clamp(viewpoint.original_image.to(self.device), 0.0 , 1.0)
+                    l1_test += self.scene.l1_loss(image, gt_image).mean().double()
+                    psnr_test += psnr(image, gt_image).mean().double()
+                psnr_test /= len(config['cameras'])
+                l1_test /= len(config['cameras'])
+                CONSOLE.log(f"\n[ITER {step}] Evaluating {config['name']}: L1 {l1_test} PSNR {psnr_test}.")
+
 
     
     def save_checkpoint(self, step: int) -> None:
