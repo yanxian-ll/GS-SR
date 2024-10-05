@@ -62,10 +62,10 @@ class Trainer:
         else:
             CONSOLE.log("Tensorboard not available: not logging progress")
 
-    def setup(self, eval=False):
+    def setup(self):
         """Setup the Trainer by calling other setup functions."""
         self.scene: Scene = self.config.scene.setup(
-            source_dir = self.config.source_path, eval = eval,
+            source_dir = self.config.source_path, eval = self.config.eval,
             device = self.device, world_size = self.world_size, local_rank = self.local_rank,
         )
         self.scene._gaussians.setup_optimizers()

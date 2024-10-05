@@ -102,6 +102,7 @@ class Config(PrintableConfig):
     method_name: Optional[str] = None # required
     experiment_name: Optional[str] = None
     timestamp: str = "{timestamp}"
+    eval: bool = False
 
     machine: MachineConfig = MachineConfig()
     trainer: TrainerConfig = TrainerConfig()

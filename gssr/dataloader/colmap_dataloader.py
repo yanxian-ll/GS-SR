@@ -134,7 +134,7 @@ class ColmapDataLoader(DataLoader):
         super().__init__(config, source_dir, eval, world_size, local_rank)
 
         assert(os.path.exists(os.path.join(self.source_dir, "sparse")), "colmap/sparse not exists")
-        scene_info = readColmapSceneInfo(self.source_dir, self.config.images, self.eval, self.config.llffhold)
+        scene_info = readColmapSceneInfo(self.source_dir, self.config.images, self.evaluation, self.config.llffhold)
 
         if self.config.shuffle:
             random.shuffle(scene_info.train_cameras)  # Multi-res consistent random shuffling
