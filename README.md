@@ -1,13 +1,14 @@
 # GS-SR: Gaussian Splatting for Surface Reconstruction
-This project was used to solve the task of surface reconstruction of a large scene. 
 
-😭The project was not innovative. 
+This project aimed to solve the task of surface reconstruction for a large scene.
 
-😮It was a purely combinatorial work. 
+😭 The project lacked innovation.
 
-😜Just for fun!!!
+😮 It was purely combinatorial work.
 
-We have reorganised the 3dgs pipeline according to [sdfstudio](https://github.com/autonomousvision/sdfstudio) to facilitate the introduction of several different surface reconstruction methods. Please use the following command to see the currently supported methods.
+😜 Just for fun!!!
+
+We have reorganized the 3DGS pipeline according to [sdfstudio](https://github.com/autonomousvision/sdfstudio) to facilitate the introduction of various surface reconstruction methods. Please use the following command to see the currently supported methods.
 
 ```bash
 
@@ -19,24 +20,25 @@ python train.py -h
 class="center">
 </p>
 
- The main components of this project are as follows:
 
-- Partition: This project fllowed the idea of [VastGaussian](https://arxiv.org/abs/2402.17427) to partition the scene. Input a colmap-sfm-output, and after partitioning, each tile remains in colmap-sfm format. This allows partitioning to be completely independent of subsequent algorithms.
+## Main Components of the Project
 
-- Representation: [Scaffold-GS](https://arxiv.org/abs/2312.00109) was chosen as the scene representation for this project because Scaffold-GS is more robust to view-dependent effects (e.g. reflection, shadowing); and alleviates the artifacts (e.g. floaters, structure error caused by redundant 3D Gaussians; and has more accurate surface artefacts. shadowing); and alleviates the artifacts (e.g. floaters, structure error) caused by redundant 3D Gaussians; and have more accurate surface reoncstruction in texture-less area. [Octree-GS](https://arxiv.org/abs/2403.17898) supports level of details (LOD), very friendly for large scene reconstruction.
+- Partition: This project follows the idea of [VastGaussian](https://arxiv.org/abs/2402.17427) to partition the scene. By inputting a COLMAP-SfM output, each tile remains in COLMAP-SfM format after partitioning. This ensures that partitioning is completely independent of subsequent algorithms.
 
-- Surface-Recon: Two surface reconstruction methods [2DGS](https://arxiv.org/abs/2403.17888) and [PGSR](https://arxiv.org/abs/2406.06521) are selected for this project. Among them, 2DGS is one of the fastest surface reconstruction methods, and PGSR is the method with the best reconstruction quality.
+- Representation: [Scaffold-GS](https://arxiv.org/abs/2312.00109) was chosen as the scene representation for this project due to its robustness against view-dependent effects (e.g., reflection, shadowing). It also alleviates artifacts such as floaters and structural errors caused by redundant 3D Gaussians, providing more accurate surface reconstruction in texture-less areas. Additionally, [Octree-GS](https://arxiv.org/abs/2403.17898) supports levels of detail (LOD), making it very suitable for large scene reconstruction.
+
+- Surface Reconstruction: Two surface reconstruction methods, [2DGS](https://arxiv.org/abs/2403.17888) and [PGSR](https://arxiv.org/abs/2406.06521), were selected for this project. 2DGS is one of the fastest surface reconstruction methods, while PGSR offers the best reconstruction quality.
 
 <p align="center">
 <img src="./assets/result.jpeg" width=100% height=100% 
 class="center">
 </p>
 
-The test results are shown above. We use Lower-Campus (See [GauU-Scene](https://arxiv.org/abs/2401.14032) for detailed information) UAV data. The results of the above figure were obtained by "VastGaussian + octree-2dgs". Compared to other methods, the method in this project is very robust and is also able to obtain more accurate results in the marginal areas of the scene and in texture-less areas. 
+We used UAV data from the Lower-Campus (see [GauU-Scene](https://arxiv.org/abs/2401.14032) for detailed information). The results in the figure were obtained using the “VastGaussian + Octree-2DGS” method. Compared to other methods, the approach used in this project is very robust and achieves more accurate results in the marginal areas of the scene and in texture-less areas.
 
 ## Installation
 
-We tested on a server configured with Ubuntu 22.04, cuda 12.3 and gcc 11.4.0. Other similar configurations should also work, but we have not verified each one individually.
+We conducted our tests on a server configured with Ubuntu 22.04, CUDA 12.3, and GCC 11.4.0. While other similar configurations should also work, we have not verified each one individually.
 
 1. Clone this repo:
 
@@ -63,11 +65,11 @@ conda activate gssr
 mkdir test
 ```
 
-The input data stucture will be organised as follows:
+The input data stucture should be organized as shown below. 
 
 ```
 test/
-├── scene1/
+├── scene/
 │   ├── input
 │   │   ├── IMG_0.jpg
 │   │   ├── IMG_1.jpg
@@ -75,18 +77,18 @@ test/
 ...
 ```
 
-2. Then, run colmap sfm by 
+2. Then, use COLMAP to compute SfM, obtaining the camera intrinsics, extrinsics, and sparse point cloud.  
 
 ```bash
 
-python convert.py -s ./test/scene1 --use_aligner
+python convert.py -s ./test/scene --use_aligner
 ```
 
-The output structure will be organised as follows:
+The output structure should be as follows: 
 
 ```
 test/
-├── scene1/
+├── scene/
 │   ├── images
 │   │   ├── IMG_0.jpg
 │   │   ├── IMG_1.jpg
@@ -96,25 +98,25 @@ test/
 ...
 ```
 
-3. If you need partition the scene:
+3. If you need to partition the scene, run the following command: 
 
 ```bash
 
-python split_scene.py -s ./test/scene1 -o ./test/scene1 -m 4 -n 1
+python split_scene.py -s ./test/scene -o ./test/scene -m 4 -n 1
 ```
 
-Where, '-m' and '-n' denote the columns and rows of the splitted scene, respectively. Currently, we have to manually determine m and n based on the scene scope and coordinate system orientation. For Lower-campus dataset, m and n are taken as 4 and 1 respectively.
+Where '-m' and '-n' denote the columns and rows of the split scene, respectively. Currently, we need to manually determine m and n based on the scene scope and coordinate system orientation. For the Lower-Campus dataset, m and n are set to '4' and '1', respectively.
 
 <p align="center">
 <img src="./assets/partition.jpeg" width=80% height=80% 
 class="center">
 </p>
 
-The output structure will be organised as follows:
+The output structure should be as follows: 
 
 ```
 test/
-├── scene1/
+├── scene/
 │   ├── sparse/
 │   │   ├──0/
 │   │   └──aligned/
@@ -144,15 +146,16 @@ test/
 
 ### Our Test Data:
 
-- The Lower-Campus dataset can be downloaded from [百度网盘](https://pan.baidu.com/s/1SwkUAs2HIeTMDX1hzqdPmg?pwd=gssr). We provide raw images, GT point-clouds and SFM processed data.
+- The Lower-Campus dataset is available for download from [Baidu Netdisk](https://pan.baidu.com/s/1SwkUAs2HIeTMDX1hzqdPmg?pwd=gssr). This dataset includes raw images, ground truth point clouds, and SFM processed data.
 
-- The CSU-Library dataset can be download from [百度网盘](https://pan.baidu.com/s/1XeWPyw9v_0d9vJEzv97cJQ?pwd=gssr). This is a building-level dataset with almost 300+ images. This dataset contains a large number of repeated textures and texture-less areas, making it a very difficult dataset to work with.
+- The CSU-Library dataset can be downloaded from [Baidu Netdisk](https://pan.baidu.com/s/1XeWPyw9v_0d9vJEzv97cJQ?pwd=gssr). This building-level dataset contains over 300 images and features numerous repeated textures and texture-less areas, making it particularly challenging to work with. 
+
 
 ### Custom Data:
 
-For custom data, you should process the image sequences with [Colmap](https://colmap.github.io/) to obtain the SfM points and camera poses.
+For custom data, process the image sequences using [Colmap](https://colmap.github.io/) to obtain the SfM points and camera poses.
 
-If partitioning is required, we recommend using ```colmap model_orientation_aligner``` aligning the coordinate axis of a model.
+If partitioning is necessary, we recommend using the ```colmap model_orientation_aligner``` to align the coordinate axes of the model.
 
 ## How to Use
 
@@ -197,11 +200,12 @@ For detailed commands, please refer to [test.sh](https://github.com/yanxian-ll/G
 
 ![alt text](assets/library-result.jpeg)
 
-- Training Speed: The training speed of GS-SR is about the same as the original version. The variations in training time are primarily due to evaluation and logging. 
+- Training Speed: The training speed of GS-SR is comparable to the original version, with variations primarily due to evaluation and logging.
 
-- Rendering Quality: Scaffold/Octree-2DGS/PGSR resulte in a significant increase in PSNR and maintain a comparable training speed. 
+- Rendering Quality: Methods like Scaffold / Octree-2DGS / PGSR significantly increase PSNR while maintaining similar training speeds.
 
-- Reconcstruction Quality: Scaffold/Octree-2DGS/PGSR ensures more robust training, especially in texture-less and scene marginal regions. And the quality of its surface reconstruction has barely deteriorated. 
+- Reconstruction Quality: These methods ensure more robust training, especially in texture-less and marginal regions of scenes, with minimal deterioration in surface reconstruction quality.
+
 
 
 ### Some suggestions
