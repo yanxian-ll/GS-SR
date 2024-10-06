@@ -171,22 +171,23 @@ python extract_mesh.py --load-config <path to config>
 ```
 
 ## Test Results
-We used the Library dataset for testing. For 3DGS / Scaffold / Octree-GS / 2DGS, we used default parameters. For PGSR, we used the following parameters:
+
+Due to time and computional power issues, we only tested on the CSU-Library dataset. And, our main purpose is to compare the speed of training and the quality of reconstruction.
+
+For 3dgs/2dgs/scaffold/octree-gs, we use the default parameters. For PGSR, to avoid out-of-memory issues, we made the following parameter adjustments:
 
 ```bash
 --opacity_cull_threshold 0.05   # for reduce the number of Gaussians, avoid out-of-memory
 --max_abs_split_points 0        # for texture-less scenes
 ```
 
-For more details, please see [test.sh](https://github.com/yanxian-ll/GS-SR/blob/main/script/test.sh). 
-
-The experimental results are shown below.
+For detailed commands, please refer to [test.sh](https://github.com/yanxian-ll/GS-SR/blob/main/script/test.sh). The experimental results are shown in the following table and figure.
 
 |method|vanilla-time|GSSR-time|vanilla-PSNR|GSSR-PSNR|
 | :------: | :------------: | :------------: | :---------------: | :-----: |
 |3DGS| 39m | 41m | 27.9 | 28.9 |
 |Scaffold-GS| 35m | 32m | 30.6 | 30.9 |
-|Octree-GS| 40m | 32m | 30.9 | 31.0 |
+|Octree-GS| 40m | 33m | 30.9 | 30.4 |
 |2DGS| 45m | 47m | \ | 26.8 |
 |PGSR| 1h26m | 1h25m | \ | 26.2 |
 |Scaffold-2DGS| \ | 51m | \ | 29.7 |
@@ -196,18 +197,33 @@ The experimental results are shown below.
 
 ![alt text](assets/library-result.jpeg)
 
-The training speed and rendering quality of GS-SR did not differ much from the original version. Combining 2DGS/PGSR with Scaffold/Octree-GS resulted in a significant increase in PSNR and maintained a comparable training speed.
-And, Scaffold/Octree-2DGS/PGSR ensures more robust training, especially in texture-less and scene marginal regions. 
+- Training Speed: The training speed of GS-SR is about the same as the original version. The variations in training time are primarily due to evaluation and logging. 
+
+- Rendering Quality: Scaffold/Octree-2DGS/PGSR resulte in a significant increase in PSNR and maintain a comparable training speed. 
+
+- Reconcstruction Quality: Scaffold/Octree-2DGS/PGSR ensures more robust training, especially in texture-less and scene marginal regions. And the quality of its surface reconstruction has barely deteriorated. 
+
 
 ### Some suggestions
 
-- If you need more speed, octree-2dgs is recommended.
+- For faster performance, octree-2dgs is recommended. 
 
-- If more accurate surface reconstruction is needed, octree-pgsr is recommended.
+```bash
 
+python train.py octree-2dgs --source-path ./test/scene1 --output-path ./output
+```
+
+- For more accurate surface reconstruction, octree-pgsr is recommended.
+
+```bash
+
+python train.py octree-pgsr --source-path ./test/scene1 --output-path ./output
+```
 
 ## Acknowledgements
+
 The project builds on the following works:
+
 - [https://github.com/autonomousvision/sdfstudio](https://github.com/autonomousvision/sdfstudio)
 - [https://github.com/kangpeilun/VastGaussian](https://github.com/kangpeilun/VastGaussian)
 - [https://github.com/graphdeco-inria/gaussian-splatting](https://github.com/graphdeco-inria/gaussian-splatting)
