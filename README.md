@@ -8,29 +8,31 @@ This project was used to solve the task of surface reconstruction of a large sce
 😜Just for fun!!!
 
 We have reorganised the 3dgs pipeline according to [sdfstudio](https://github.com/autonomousvision/sdfstudio) to facilitate the introduction of several different surface reconstruction methods. Please use the following command to see the currently supported methods.
+
 ```bash
+
 python train.py -h
 ```
+
 <p align="center">
 <img src="./assets/methods.png" width=100% height=100% 
 class="center">
 </p>
 
-## Test Result
+ The main components of this project are as follows:
+
+- Partition: This project fllowed the idea of [VastGaussian](https://arxiv.org/abs/2402.17427) to partition the scene. Input a colmap-sfm-output, and after partitioning, each tile remains in colmap-sfm format. This allows partitioning to be completely independent of subsequent algorithms.
+
+- Representation: [Scaffold-GS](https://arxiv.org/abs/2312.00109) was chosen as the scene representation for this project because Scaffold-GS is more robust to view-dependent effects (e.g. reflection, shadowing); and alleviates the artifacts (e.g. floaters, structure error caused by redundant 3D Gaussians; and has more accurate surface artefacts. shadowing); and alleviates the artifacts (e.g. floaters, structure error) caused by redundant 3D Gaussians; and have more accurate surface reoncstruction in texture-less area. [Octree-GS](https://arxiv.org/abs/2403.17898) supports level of details (LOD), very friendly for large scene reconstruction.
+
+- Surface-Recon: Two surface reconstruction methods [2DGS](https://arxiv.org/abs/2403.17888) and [PGSR](https://arxiv.org/abs/2406.06521) are selected for this project. Among them, 2DGS is one of the fastest surface reconstruction methods, and PGSR is the method with the best reconstruction quality.
+
 <p align="center">
 <img src="./assets/result.jpeg" width=100% height=100% 
 class="center">
 </p>
 
- The test results are shown above. We use Lower-Campus(See [GauU-Scene](https://arxiv.org/abs/2401.14032) for detailed information) UAV data. The results of the above figure were obtained by "VastGaussian + Octree-GS + 2DGS". Compared to other methods, the method in this project is very robust and is also able to obtain more accurate results in the marginal areas of the scene and in texture-less areas. 
- 
- The main components of this project are as follows:
-
-- This project uses the idea of [VastGaussian](https://arxiv.org/abs/2402.17427) to partition the scene, with slightly different implementation details. Input a colmap-sfm-output, and after partitioning, each tile remains in colmap-sfm format. This allows partitioning to be completely independent of subsequent algorithms.
-
-- [Scaffold-GS](https://arxiv.org/abs/2312.00109) was chosen as the scene representation for this project because Scaffold-GS is more robust to view-dependent effects (e.g. reflection, shadowing); and alleviates the artifacts (e.g. floaters, structure error caused by redundant 3D Gaussians; and has more accurate surface artefacts. shadowing); and alleviates the artifacts (e.g. floaters, structure error) caused by redundant 3D Gaussians; and have more accurate surface reoncstruction in texture-less area. [Octree-GS](https://arxiv.org/abs/2403.17898) supports level of details (LOD), very friendly for large scene reconstruction.
-
-- Two surface reconstruction methods [2DGS](https://arxiv.org/abs/2403.17888) and [PGSR](https://arxiv.org/abs/2406.06521) are selected for this project. Among them, 2DGS is one of the fastest surface reconstruction methods, and PGSR is the method with the best reconstruction quality.
+The test results are shown above. We use Lower-Campus (See [GauU-Scene](https://arxiv.org/abs/2401.14032) for detailed information) UAV data. The results of the above figure were obtained by "VastGaussian + octree-2dgs". Compared to other methods, the method in this project is very robust and is also able to obtain more accurate results in the marginal areas of the scene and in texture-less areas. 
 
 ## Installation
 
@@ -168,11 +170,48 @@ python train.py octree-2dgs --source-path ./test/scene1 --output-path ./output
 python extract_mesh.py --load-config <path to config>
 ```
 
+## Test Results
+We used the Library dataset for testing. For 3DGS / Scaffold / Octree-GS / 2DGS, we used default parameters. For PGSR, we used the following parameters:
+
+```bash
+--opacity_cull_threshold 0.05   # for reduce the number of Gaussians, avoid out-of-memory
+--max_abs_split_points 0        # for texture-less scenes
+```
+
+For more details, please see [test.sh](https://github.com/yanxian-ll/GS-SR/blob/main/script/test.sh). 
+
+The experimental results are shown below.
+
+|method|vanilla-time|GSSR-time|vanilla-PSNR|GSSR-PSNR|
+| :------: | :------------: | :------------: | :---------------: | :-----: |
+|3DGS| 39m | 41m | 27.9 | 28.9 |
+|Scaffold-GS| 35m | 32m | 30.6 | 30.9 |
+|Octree-GS| 40m | 32m | 30.9 | 31.0 |
+|2DGS| 45m | 47m | \ | 26.8 |
+|PGSR| 1h26m | 1h25m | \ | 26.2 |
+|Scaffold-2DGS| \ | 51m | \ | 29.7 |
+|Scaffold-PGSR| \ | 1h27m | \ | 30.5 |
+|Octree-2DGS| \ | 49m | \ | 29.2 |
+|Octree-PGSR| \ | 1h21m | \ | 29.9 |
+
+![alt text](assets/library-result.jpeg)
+
+The training speed and rendering quality of GS-SR did not differ much from the original version. Combining 2DGS/PGSR with Scaffold/Octree-GS resulted in a significant increase in PSNR and maintained a comparable training speed.
+And, Scaffold/Octree-2DGS/PGSR ensures more robust training, especially in texture-less and scene marginal regions. 
+
+### Some suggestions
+
+- If you need more speed, octree-2dgs is recommended.
+
+- If more accurate surface reconstruction is needed, octree-pgsr is recommended.
+
+
 ## Acknowledgements
 The project builds on the following works:
-- https://github.com/kangpeilun/VastGaussian
-- https://github.com/graphdeco-inria/gaussian-splatting
-- https://github.com/city-super/Scaffold-GS
-- https://github.com/city-super/Octree-GS
-- https://github.com/hbb1/2d-gaussian-splatting
-- https://github.com/zju3dv/PGSR
+- [https://github.com/autonomousvision/sdfstudio](https://github.com/autonomousvision/sdfstudio)
+- [https://github.com/kangpeilun/VastGaussian](https://github.com/kangpeilun/VastGaussian)
+- [https://github.com/graphdeco-inria/gaussian-splatting](https://github.com/graphdeco-inria/gaussian-splatting)
+- [https://github.com/city-super/Scaffold-GS](https://github.com/city-super/Scaffold-GS)
+- [https://github.com/city-super/Octree-GS](https://github.com/city-super/Octree-GS)
+- [https://github.com/hbb1/2d-gaussian-splatting](https://github.com/hbb1/2d-gaussian-splatting)
+- [https://github.com/zju3dv/PGSR](https://github.com/zju3dv/PGSR)
