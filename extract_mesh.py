@@ -5,8 +5,8 @@ import sys
 import torch
 import tyro
 from rich.console import Console
-from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
+from dataclasses import dataclass
+from typing import Tuple
 import open3d as o3d
 
 from gssr.configs import base_config as cfg
@@ -14,9 +14,7 @@ from gssr.scene.base_scene import Scene
 from gssr.utils.mesh_utils import GaussianExtractor, post_process_mesh
 from gssr.utils.render_utils import generate_path, create_videos
 
-
 CONSOLE = Console(width=120)
-
 
 def eval_load_gaussians(config: cfg.TrainerConfig, scene: Scene) -> Path:
     assert config.load_gaussian_dir is not None

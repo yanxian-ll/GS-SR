@@ -23,11 +23,11 @@ class="center">
 
 ## Main Components of the Project
 
-- Partition: This project follows the idea of [VastGaussian](https://arxiv.org/abs/2402.17427) to partition the scene. By inputting a COLMAP-SfM output, each tile remains in COLMAP-SfM format after partitioning. This ensures that partitioning is completely independent of subsequent algorithms.
+- **Partition**: This project follows the idea of [VastGaussian](https://arxiv.org/abs/2402.17427) to partition the scene. By inputting a COLMAP-SfM output, each tile remains in COLMAP-SfM format after partitioning. This ensures that partitioning is completely independent of subsequent algorithms.
 
-- Representation: [Scaffold-GS](https://arxiv.org/abs/2312.00109) was chosen as the scene representation for this project due to its robustness against view-dependent effects (e.g., reflection, shadowing). It also alleviates artifacts such as floaters and structural errors caused by redundant 3D Gaussians, providing more accurate surface reconstruction in texture-less areas. Additionally, [Octree-GS](https://arxiv.org/abs/2403.17898) supports levels of detail (LOD), making it very suitable for large scene reconstruction.
+- **Representation**: [Scaffold-GS](https://arxiv.org/abs/2312.00109) was chosen as the scene representation for this project due to its robustness against view-dependent effects (e.g., reflection, shadowing). It also alleviates artifacts such as floaters and structural errors caused by redundant 3D Gaussians, providing more accurate surface reconstruction in texture-less areas. Additionally, [Octree-GS](https://arxiv.org/abs/2403.17898) supports levels of detail (LOD), making it very suitable for large scene reconstruction.
 
-- Surface Reconstruction: Two surface reconstruction methods, [2DGS](https://arxiv.org/abs/2403.17888) and [PGSR](https://arxiv.org/abs/2406.06521), were selected for this project. 2DGS is one of the fastest surface reconstruction methods, while PGSR offers the best reconstruction quality.
+- **Surface Reconstruction**: Two surface reconstruction methods, [2DGS](https://arxiv.org/abs/2403.17888) and [PGSR](https://arxiv.org/abs/2406.06521), were selected for this project. 2DGS is one of the fastest surface reconstruction methods, while PGSR offers the best reconstruction quality.
 
 <p align="center">
 <img src="./assets/result.jpeg" width=100% height=100% 
@@ -197,11 +197,11 @@ For detailed commands, please refer to [test.sh](https://github.com/yanxian-ll/G
 
 ![alt text](assets/library-result.jpeg)
 
-- Training Speed: The training speed of GS-SR is comparable to the original version, with variations primarily due to evaluation and logging.
+- **Training Speed**: The training speed of GS-SR is comparable to the original version, with variations primarily due to evaluation and logging.
 
-- Rendering Quality: Methods like Scaffold / Octree-2DGS / PGSR significantly increase PSNR while maintaining similar training speeds.
+- **Rendering Quality**: Methods like Scaffold / Octree-2DGS / PGSR significantly increase PSNR while maintaining similar training speeds.
 
-- Reconstruction Quality: These methods ensure more robust training, especially in texture-less and marginal regions of scenes, with minimal deterioration in surface reconstruction quality.
+- **Reconstruction Quality**: These methods ensure more robust training, especially in texture-less and marginal regions of scenes, with minimal deterioration in surface reconstruction quality.
 
 
 

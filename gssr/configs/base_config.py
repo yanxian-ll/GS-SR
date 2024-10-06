@@ -90,6 +90,15 @@ class TrainerConfig(PrintableConfig):
     load_gaussian_step: Optional[int] = None
     load_config: Optional[Path] = None
 
+@dataclass
+class PartitionConfig(PrintableConfig):
+    need_partition: bool = False
+    num_col: int = 4
+    num_row: int = 1
+    extend_ratio: float = 0.1
+    visibility_threshold: float = 0.5
+    config_of_tiles: list[Path] = field(default_factory=lambda:list)
+
 
 from gssr.scene.base_scene import SceneConfig
 
@@ -107,9 +116,11 @@ class Config(PrintableConfig):
     machine: MachineConfig = MachineConfig()
     trainer: TrainerConfig = TrainerConfig()
     scene: SceneConfig = SceneConfig()
+    partitioner: PartitionConfig = PartitionConfig()
 
     writer: str = "tensorboard"
     relative_log_dir: Path = Path("logs")
+    relative_config_dir: Path = Path("./")
 
     def is_tensorboard_enabled(self) -> bool:
         """Checks if tensorboard is enabled."""
@@ -139,6 +150,9 @@ class Config(PrintableConfig):
     def get_checkpoint_dir(self) -> Path:
         """Retrieve the checkpoint directory"""
         return Path(self.get_base_dir() / self.trainer.relative_ckpt_dir)
+    
+    def get_config_dir(self) -> Path:
+        return Path(self.get_base_dir() / self.relative_config_dir)
 
     def print_to_terminal(self) -> None:
         """Helper to pretty print config to terminal"""
@@ -148,9 +162,10 @@ class Config(PrintableConfig):
 
     def save_config(self) -> None:
         """Save config to base directory"""
-        base_dir = self.get_base_dir()
-        assert base_dir is not None
-        base_dir.mkdir(parents=True, exist_ok=True)
-        config_yaml_path = base_dir / "config.yml"
+        config_dir = self.get_config_dir()
+        assert config_dir is not None
+        config_dir.mkdir(parents=True, exist_ok=True)
+        config_yaml_path = config_dir / "config.yml"
         CONSOLE.log(f"Saving config to: {config_yaml_path}")
         config_yaml_path.write_text(yaml.dump(self), "utf8")
+

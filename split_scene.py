@@ -1,17 +1,38 @@
-import os
-from argparse import ArgumentParser
+from pathlib import Path
+from dataclasses import dataclass
+import tyro
+
 from gssr.utils.vastgaussian_utils import split_scene
+from typing import Optional
 
 
-parser = ArgumentParser("Split the Scene(COLMAP-SFM)")
-parser.add_argument("--source_path", "-s", required=True, type=str, help="the colmap-sfm result path")
-parser.add_argument("--output_path", "-o", required=True, type=str, help="")
-parser.add_argument("--m", type=int, default=2, help="row")
-parser.add_argument("--n", type=int, default=2, help="col")
-parser.add_argument("--ratio", type=float, default=0.1, help="tile extend ratio")
-parser.add_argument("--threshold", type=float, default=0.5, help="visibility threshold")
-args = parser.parse_args()
+@dataclass
+class SceneSpliter:
+    """partition the scene (only support colmap form)"""
+    source_path: Path
+    output_path: Optional[Path] = None
+    num_col: Optional[int] = 4
+    num_row: Optional[int] = 1
+    extend_ratio: float = 0.1
+    visibility_threshold: float = 0.5
 
-split_scene(args.source_path, args.output_path, args.m, args.n, 
-            transform_matrix=None, ratio=args.ratio, threshold=args.threshold, 
-            input_format="", output_format=".txt")
+    def main(self) -> None:
+        if self.output_path is None:
+            self.output_path = self.source_path
+
+        split_scene(self.source_path, self.output_path, 
+                    self.num_col, self.num_row, 
+                    transform_matrix=None, 
+                    ratio=self.extend_ratio, 
+                    threshold=self.visibility_threshold, 
+                    input_format="", output_format=".txt")
+
+
+def entrypoint():
+    tyro.extras.set_accent_color("bright_yellow")
+    tyro.cli(SceneSpliter).main()
+
+
+if __name__ == "__main__":
+    entrypoint()
+

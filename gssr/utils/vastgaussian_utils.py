@@ -15,9 +15,9 @@ from simple_knn._C import distCUDA2
 
 def transform_colmap(input_model, output_model, P, output_format='.txt'):
     cameras, images, points3D = read_model(path=input_model, ext="")
-    print("num_cameras:", len(cameras))
-    print("num_images:", len(images))
-    print("num_points3D:", len(points3D))
+    # print("num_cameras:", len(cameras))
+    # print("num_images:", len(images))
+    # print("num_points3D:", len(points3D))
 
     images_new = {}
     for i, extr in images.items():
@@ -84,8 +84,8 @@ def camera_position_based_region_division(images, m, n):
     for i in range(m):
         tiles_col_images.append(sorted_images[i*num_img_per_col: (
                 (i+1)*num_img_per_col if (i+1)*num_img_per_col<num_images else num_images)])
-        print(f"m_tile_{i} info, num-images:{len(tiles_col_images[i])}, \
-              min:{tiles_col_images[i][0]['center'][0]}, max:{tiles_col_images[i][-1]['center'][0]}")
+        # print(f"m_tile_{i} info, num-images:{len(tiles_col_images[i])}, \
+            #   min:{tiles_col_images[i][0]['center'][0]}, max:{tiles_col_images[i][-1]['center'][0]}")
     
     tiles = []
     for idx, col_images in enumerate(tiles_col_images):
@@ -102,7 +102,7 @@ def camera_position_based_region_division(images, m, n):
             tiles[-1].update({
                 "images": [img['image'] for img in tiles[-1]['images']],
                 "box": np.array([mx, Mx, my, My])})
-            print(f"num-images:{len(tiles[-1]['images'])}, mx:{mx}, Mx:{Mx}, my:{my}, My:{My}")
+            # print(f"num-images:{len(tiles[-1]['images'])}, mx:{mx}, Mx:{Mx}, my:{my}, My:{My}")
     return tiles
 
 
@@ -131,9 +131,9 @@ def position_based_data_selection(tiles, images, points3D, ratio=0.2):
         # update images and points
         images_in_box, points3D_in_box = box_based_update(new_box, images, points3D)
         new_tiles.append({'images': images_in_box, 'box': new_box, 'points3D': points3D_in_box})
-        print(f"tile_{i}_info, num-images:{len(new_tiles[i]['images'])}, \
-            num-points:{len(new_tiles[i]['points3D'])}, \
-            mx:{new_box[0]}, Mx:{new_box[1]}, my:{new_box[2]}, My:{new_box[3]}")
+        # print(f"tile_{i}_info, num-images:{len(new_tiles[i]['images'])}, \
+        #     num-points:{len(new_tiles[i]['points3D'])}, \
+        #     mx:{new_box[0]}, Mx:{new_box[1]}, my:{new_box[2]}, My:{new_box[3]}")
     return new_tiles
 
 
@@ -221,15 +221,15 @@ def visibility_based_camera_selection(tiles, images, cameras, threshod=0.25):
                 if (ratio > threshod) and (d < md):
                 # if (ratio > threshod):
                     temp_list.append(extr)
-                    print(f"adsd new-image {extr.name} into tile_{idx}, ratio:{ratio}, intersection-area:{intersections.area}, image-area:{intr.width*intr.height}")
+                    # print(f"adsd new-image {extr.name} into tile_{idx}, ratio:{ratio}, intersection-area:{intersections.area}, image-area:{intr.width*intr.height}")
         add_images.append({"images": temp_list})
     
     # update images
     for i, (new_images, tile) in enumerate(zip(add_images, tiles)):
         new_tiles[i]["images"] = new_images["images"] + tile["images"]
         new_box = new_tiles[i]['box']
-        print(f"tile_{i}_info, num-images:{len(new_tiles[i]['images'])}, num-points:{len(new_tiles[i]['points3D'])}, \
-            mx:{new_box[0]}, Mx:{new_box[1]}, my:{new_box[2]}, My:{new_box[3]}, mz:{new_box[4]}, Mz:{new_box[5]}")
+        # print(f"tile_{i}_info, num-images:{len(new_tiles[i]['images'])}, num-points:{len(new_tiles[i]['points3D'])}, \
+        #     mx:{new_box[0]}, Mx:{new_box[1]}, my:{new_box[2]}, My:{new_box[3]}, mz:{new_box[4]}, Mz:{new_box[5]}")
     return new_tiles
 
 
@@ -245,7 +245,7 @@ def coverage_based_point_selection(tiles, points3D):
         new_tiles.append(
             {"images": tile["images"], "box": tile["box"], "points3D": points}
         )
-        print(f"tile_{i}_info, num-images:{len(tile['images'])}, num-points:{len(points)}")
+        # print(f"tile_{i}_info, num-images:{len(tile['images'])}, num-points:{len(points)}")
     return new_tiles
 
 
@@ -317,3 +317,4 @@ def split_scene(scene_path, output_path, m, n, transform_matrix=None, ratio=0.2,
             orig_path = os.path.join(scene_path, 'images', img.name)
             new_path = os.path.join(image_path, img.name)
             shutil.copy(orig_path, new_path)
+            

@@ -88,7 +88,7 @@ def main(config: cfg.Config) -> None:
     if config.trainer.load_config:
         CONSOLE.log(f"Loading pre-set config from: {config.trainer.load_config}")
         config = yaml.load(config.trainer.load_config.read_text(), Loader=yaml.Loader)
-
+    
     # print and save config
     config.print_to_terminal()
     config.save_config()
@@ -105,7 +105,6 @@ def main(config: cfg.Config) -> None:
 
 from gssr.configs.method_config import AnnotatedBaseConfigUnion
 from gssr.configs.config_utils import convert_markup_to_ansi
-from gssr.configs.method_config import method_configs
 
 def entrypoint():
     """Entrypoint for use with pyproject scripts."""
@@ -118,8 +117,7 @@ def entrypoint():
         )
     )
 
-    # ## for test
-    # main(method_configs['octree-pgsr'])
+
 
 if __name__ == "__main__":
     entrypoint()
