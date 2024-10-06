@@ -92,12 +92,12 @@ class TrainerConfig(PrintableConfig):
 
 @dataclass
 class PartitionConfig(PrintableConfig):
-    need_partition: bool = False
+    need_partition: bool = True
     num_col: int = 4
     num_row: int = 1
     extend_ratio: float = 0.1
     visibility_threshold: float = 0.5
-    config_of_tiles: list[Path] = field(default_factory=lambda:list)
+    config_of_tiles: List[Path] = field(default_factory=list)
 
 
 from gssr.scene.base_scene import SceneConfig
