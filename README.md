@@ -34,7 +34,7 @@ class="center">
 class="center">
 </p>
 
-We used UAV data from the Lower-Campus (see [GauU-Scene](https://arxiv.org/abs/2401.14032) for detailed information). The results in the figure were obtained using the “VastGaussian + Octree-2DGS” method. Compared to other methods, the approach used in this project is very robust and achieves more accurate results in the marginal areas of the scene and in texture-less areas.
+We used UAV data from the Lower-Campus (see [GauU-Scene](https://arxiv.org/abs/2401.14032) for detailed information). The results in the figure were obtained using the “VastGaussian + Octree-2DGS” method. Compared to other methods, the approach used in this project is very robust and achieves more accurate results in the marginal areas of the scene and in texture-less areas. Notably, we did not apply any special processing to the marginal areas of the scene.
 
 ## Installation
 
@@ -138,11 +138,11 @@ test/
 
 - The MipNeRF360 scenes are provided by the paper author [here](https://jonbarron.info/mipnerf360/). 
 
-- The SfM data sets for Tanks&Temples and Deep Blending are hosted by 3D-Gaussian-Splatting [here](https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/datasets/input/tandt_db.zip).
+- The SfM datasets for Tanks&Temples and Deep Blending are hosted by 3D-Gaussian-Splatting [here](https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/datasets/input/tandt_db.zip).
 
 - The BungeeNeRF dataset is available in [Google Drive](https://drive.google.com/file/d/1nBLcf9Jrr6sdxKa1Hbd47IArQQ_X8lww/view?usp=sharing)/[百度网盘[提取码:4whv]](https://pan.baidu.com/s/1AUYUJojhhICSKO2JrmOnCA). 
 
-- The MatrixCity dataset can be downloaded from [Hugging Face](https://huggingface.co/datasets/BoDai/MatrixCity/tree/main)/[Openxlab](https://openxlab.org.cn/datasets/bdaibdai/MatrixCity)/[百度网盘[提取码:hqnn]](https://pan.baidu.com/share/init?surl=87P0e5p1hz9t5mgdJXjL1g). [Point clouds](https://drive.google.com/file/d/1J5sGnKhtOdXpGY0SVt-2D_VmL5qdrIc5/view?usp=sharing) used for training.
+- The MatrixCity dataset can be downloaded from [Hugging Face](https://huggingface.co/datasets/BoDai/MatrixCity/tree/main)/[Openxlab](https://openxlab.org.cn/datasets/bdaibdai/MatrixCity)/[百度网盘[提取码:hqnn]](https://pan.baidu.com/share/init?surl=87P0e5p1hz9t5mgdJXjL1g). [The point clouds](https://drive.google.com/file/d/1J5sGnKhtOdXpGY0SVt-2D_VmL5qdrIc5/view?usp=sharing) used for training are also available.
 
 ### Our Test Data:
 
@@ -163,7 +163,7 @@ If partitioning is necessary, we recommend using the ```colmap model_orientation
 
 ```bash
 
-python train.py octree-2dgs --source-path ./test/scene1 --output-path ./output
+python train.py octree-2dgs --source-path ./test/scene --output-path ./output
 ```
 
 ### Extract Mesh
@@ -214,14 +214,14 @@ For detailed commands, please refer to [test.sh](https://github.com/yanxian-ll/G
 
 ```bash
 
-python train.py octree-2dgs --source-path ./test/scene1 --output-path ./output
+python train.py octree-2dgs --source-path ./test/scene --output-path ./output
 ```
 
 - For more accurate surface reconstruction, octree-pgsr is recommended.
 
 ```bash
 
-python train.py octree-pgsr --source-path ./test/scene1 --output-path ./output
+python train.py octree-pgsr --source-path ./test/scene --output-path ./output
 ```
 
 ## Acknowledgements
