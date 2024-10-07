@@ -1,11 +1,10 @@
 import os
 import torch
-import shutil
 import numpy as np
-from tqdm import tqdm
 from scipy.spatial import ConvexHull
-from plyfile import PlyData, PlyElement
 from shapely.geometry import Polygon, box
+from typing import Tuple, Optional, Dict, List
+import numpy as np
 
 from gssr.utils.colmap_read_write_model import read_model, write_model, \
                                     qvec2rotmat, rotmat2qvec, \
@@ -13,7 +12,23 @@ from gssr.utils.colmap_read_write_model import read_model, write_model, \
 from simple_knn._C import distCUDA2
 
 
-def transform_colmap(input_model, output_model, P, output_format='.txt'):
+def transform_colmap(input_model: str, output_model: str, transform_file: str, output_format: str = '.txt') -> Tuple:
+    # read transform file
+    with open(transform_file, 'r') as f:
+        transform_matrix = [np.array(
+            [float(item) for item in line.strip().split(" ")]) 
+                for line in f.readlines()]
+        
+    P = np.vstack(transform_matrix)
+    assert((P.shape[0]==4) and (P.shape[1]==4)), "transform matrix should be 4x4"
+
+    P[:3, -1] = 0   # remove translation    
+    # remove scale in rotation matrix
+    R = P[:3, :3]
+    scales = np.sqrt(np.sum(R*R, axis=1))
+    R_new = R / scales[:, np.newaxis]
+    P[:3, :3] = R_new
+
     cameras, images, points3D = read_model(path=input_model, ext="")
     # print("num_cameras:", len(cameras))
     # print("num_images:", len(images))
@@ -50,15 +65,15 @@ def transform_colmap(input_model, output_model, P, output_format='.txt'):
     os.makedirs(output_model, exist_ok=True)
     write_model(cameras, images_new, points3D_new, path=output_model, ext=output_format)
 
-    points = np.vstack(list_xyz)
-    rgbs = np.vstack(list_rgb)
-    normals = np.zeros_like(points)
-    dtype_full = [('x', 'f4'), ('y', 'f4'), ('z', 'f4'), ('nx', 'f4'), ('ny', 'f4'), ('nz', 'f4'), ('red', 'u1'), ('green', 'u1'), ('blue', 'u1')]
-    elements = np.empty(points.shape[0], dtype=dtype_full)
-    attributes = np.concatenate((points, normals, rgbs), axis=1)
-    elements[:] = list(map(tuple, attributes))
-    el = PlyElement.describe(elements, 'vertex')
-    PlyData([el]).write(os.path.join(output_model, "points3D.ply"))
+    # points = np.vstack(list_xyz)
+    # rgbs = np.vstack(list_rgb)
+    # normals = np.zeros_like(points)
+    # dtype_full = [('x', 'f4'), ('y', 'f4'), ('z', 'f4'), ('nx', 'f4'), ('ny', 'f4'), ('nz', 'f4'), ('red', 'u1'), ('green', 'u1'), ('blue', 'u1')]
+    # elements = np.empty(points.shape[0], dtype=dtype_full)
+    # attributes = np.concatenate((points, normals, rgbs), axis=1)
+    # elements[:] = list(map(tuple, attributes))
+    # el = PlyElement.describe(elements, 'vertex')
+    # PlyData([el]).write(os.path.join(output_model, "points3D.ply"))
     return cameras, images_new, points3D_new
 
 def get_cam_center(extr):
@@ -70,39 +85,65 @@ def get_cam_center(extr):
     w2c[3, 3] = 1.0
     return np.linalg.inv(w2c)[:3, -1]
 
-def camera_position_based_region_division(images, m, n):
+
+def camera_position_based_region_division(images: Dict, num_col: Optional[int]=None, num_row: Optional[int]=None, max_num_images: int = 150):
     images_new = []
     for i, img in images.items():
         images_new.append({"image": img, "center": get_cam_center(img)})
-
     images = images_new.copy()
 
-    num_images = len(images)
-    num_img_per_col = num_images // m
-    sorted_images = sorted(images, key=lambda x: x['center'][0])
-    tiles_col_images = []
-    for i in range(m):
-        tiles_col_images.append(sorted_images[i*num_img_per_col: (
-                (i+1)*num_img_per_col if (i+1)*num_img_per_col<num_images else num_images)])
-        # print(f"m_tile_{i} info, num-images:{len(tiles_col_images[i])}, \
-            #   min:{tiles_col_images[i][0]['center'][0]}, max:{tiles_col_images[i][-1]['center'][0]}")
-    
     tiles = []
-    for idx, col_images in enumerate(tiles_col_images):
-        num_images = len(col_images)
-        num_img_per_tile = num_images // n
-        sorted_images = sorted(col_images, key=lambda x: x['center'][1])
-        for i in range(n):
-            tiles.append({"images": sorted_images[i*num_img_per_tile: (
-                (i+1)*num_img_per_tile if (i+1)*num_img_per_tile<num_images else num_images)]})
-            mx = min([c['center'][0] for c in tiles[-1]['images']])
-            Mx = max([c['center'][0] for c in tiles[-1]['images']])
-            my = min([c['center'][1] for c in tiles[-1]['images']])
-            My = max([c['center'][1] for c in tiles[-1]['images']])
-            tiles[-1].update({
-                "images": [img['image'] for img in tiles[-1]['images']],
-                "box": np.array([mx, Mx, my, My])})
-            # print(f"num-images:{len(tiles[-1]['images'])}, mx:{mx}, Mx:{Mx}, my:{my}, My:{My}")
+    list_tiles = []
+
+    if (num_col is None) or (num_row is None):
+        def quadtree_split(images: List[Dict]) -> None:
+            centers = np.vstack([image['center'] for image in images])
+            # get bounding box
+            mx, Mx, my, My = np.min(centers[:,0]), np.max(centers[:,0]), np.min(centers[:,1]), np.max(centers[:,1])
+            # 
+            split_axis = 0 if (Mx-mx)>(My-my) else 1
+            # sort by split_axis
+            sorted_images = sorted(images, key=lambda x: x['center'][split_axis])
+            # split
+            split1 = sorted_images[:int(len(sorted_images)//2)]
+            split2 = sorted_images[int(len(sorted_images)//2):]
+            if len(split1) < max_num_images:
+                list_tiles.append(split1)
+            else:
+                quadtree_split(split1)
+            if len(split2) < max_num_images:
+                list_tiles.append(split2)
+            else:
+                quadtree_split(split2)
+        # split scene
+        quadtree_split(images)
+        
+    else:
+        num_images = len(images)
+        num_img_per_col = num_images // num_col
+        sorted_images = sorted(images, key=lambda x: x['center'][0])
+        col_of_tiles = []
+        for i in range(num_col):
+            col_of_tiles.append(sorted_images[i*num_img_per_col: (
+                    (i+1)*num_img_per_col if (i+1)*num_img_per_col<num_images else num_images)])
+    
+        for idx, col in enumerate(col_of_tiles):
+            num_images = len(col)
+            num_img_per_tile = num_images // num_row
+            sorted_images = sorted(col, key=lambda x: x['center'][1])
+            for i in range(num_row):
+                list_tiles.append(sorted_images[i*num_img_per_tile: (
+                    (i+1)*num_img_per_tile if (i+1)*num_img_per_tile<num_images else num_images)])
+    
+    # compute box
+    for tile in list_tiles:
+        centers = np.vstack([t['center'] for t in tile])
+        mx, Mx, my, My = np.min(centers[:,0]), np.max(centers[:,0]), np.min(centers[:,1]), np.max(centers[:,1])
+        tiles.append({
+            "images": tile,
+            "box": np.array([mx, Mx, my, My])
+        })
+
     return tiles
 
 
@@ -130,10 +171,10 @@ def position_based_data_selection(tiles, images, points3D, ratio=0.2):
         new_box = np.array([mx-dw, Mx+dw, my-dh, My+dh])
         # update images and points
         images_in_box, points3D_in_box = box_based_update(new_box, images, points3D)
-        new_tiles.append({'images': images_in_box, 'box': new_box, 'points3D': points3D_in_box})
-        # print(f"tile_{i}_info, num-images:{len(new_tiles[i]['images'])}, \
-        #     num-points:{len(new_tiles[i]['points3D'])}, \
-        #     mx:{new_box[0]}, Mx:{new_box[1]}, my:{new_box[2]}, My:{new_box[3]}")
+        # new_tiles.append({'images': images_in_box, 'box': new_box, 'points3D': points3D_in_box})
+
+        ## we do not update box
+        new_tiles.append({'images': images_in_box, 'box': tile['box'], 'points3D': points3D_in_box})
     return new_tiles
 
 
@@ -187,14 +228,10 @@ def visibility_based_camera_selection(tiles, images, cameras, threshod=0.25):
         points_valid = points_tensor[mask]
         mz = points_valid[:, -1].min().item()
         Mz = points_valid[:, -1].max().item()
-        # mz = min([p.xyz[-1] for p in points3D_tile])
-        # Mz = max([p.xyz[-1] for p in points3D_tile])
-        new_tiles.append({'box': np.array([mx, Mx, my, My, mz, Mz]), 'points3D': points3D_tile})
         bounding_box = np.array([[mx, my, mz, 1.0], [mx, my, Mz, 1.0], 
                                  [mx, My, mz, 1.0], [mx, My, Mz, 1.0],
                                  [Mx, my, mz, 1.0], [Mx, my, Mz, 1.0],
                                  [Mx, My, mz, 1.0], [Mx, My, Mz, 1.0],])  #(8x4)
-        
         # compute mean camera-tile distance
         centers = np.vstack([get_cam_center(img) for img in tile['images']])  #(N,3)
         list_d = []
@@ -226,10 +263,11 @@ def visibility_based_camera_selection(tiles, images, cameras, threshod=0.25):
     
     # update images
     for i, (new_images, tile) in enumerate(zip(add_images, tiles)):
-        new_tiles[i]["images"] = new_images["images"] + tile["images"]
-        new_box = new_tiles[i]['box']
-        # print(f"tile_{i}_info, num-images:{len(new_tiles[i]['images'])}, num-points:{len(new_tiles[i]['points3D'])}, \
-        #     mx:{new_box[0]}, Mx:{new_box[1]}, my:{new_box[2]}, My:{new_box[3]}, mz:{new_box[4]}, Mz:{new_box[5]}")
+        new_tiles.append({
+            "images": new_images["images"] + tile["images"],
+            "box": tile["box"],
+            "points3D": tile["points3D"],
+        })
     return new_tiles
 
 
@@ -245,76 +283,4 @@ def coverage_based_point_selection(tiles, points3D):
         new_tiles.append(
             {"images": tile["images"], "box": tile["box"], "points3D": points}
         )
-        # print(f"tile_{i}_info, num-images:{len(tile['images'])}, num-points:{len(points)}")
     return new_tiles
-
-
-# refer-code: https://github.com/kangpeilun/VastGaussian
-# parper: VastGaussian: Vast 3D Gaussians for Large Scene Reconstruction
-def split_scene(scene_path, output_path, m, n, transform_matrix=None, ratio=0.2, threshold=0.25, input_format="", output_format=".txt"):
-    os.makedirs(output_path, exist_ok=True)
-
-    # transform colmap-sfm result
-    if transform_matrix is None:
-        P = np.identity(4)
-    else:
-        assert((transform_matrix.shape[0]==4) & (transform_matrix.shape[0]==1) )
-        P[:3, -1] = 0   # remove translation    
-        # remove scale in rotation matrix
-        R = P[:3, :3]
-        scales = np.sqrt(np.sum(R*R, axis=1))
-        R_new = R / scales[:, np.newaxis]
-        P[:3, :3] = R_new
-    
-    ## transform coordinate, so that the Z-axis of the world coordinate is perpendicular to the ground plane
-    cameras, images, points3D = transform_colmap(os.path.join(scene_path, "sparse/0"), 
-                                                 os.path.join(output_path, "sparse/aligned"), P, output_format)
-
-    # Camera-position-based region division
-    print("\nCamera-position-based region division")
-    tiles = camera_position_based_region_division(images, m, n)
-    
-    # Position-based data selection
-    print("\nPosition-based data selection")
-    tiles = position_based_data_selection(tiles, images, points3D, ratio=ratio)
-    
-    # Visibility-based camera selection
-    print("\nVisibility-based camera selection")
-    tiles = visibility_based_camera_selection(tiles, images, cameras, threshod=threshold)
-
-    # Coverage-based point selection
-    print("\nCoverage-based point selection")
-    tiles = coverage_based_point_selection(tiles, points3D)
-
-    # write tiles as colmap form
-    print("\nWrite tiles as colmap form")
-    for i, tile in tqdm(enumerate(tiles)):
-        images_tile = tile['images']
-        points3D_tile = tile['points3D']
-        images_tile_dict, points3D_tile_dict = {}, {}
-        for img in images_tile: images_tile_dict[img.id]=img
-        for point in points3D_tile: points3D_tile_dict[point.id]=point
-
-        # write sparse/0/...
-        tile_name = 'tile_%04d' % i
-        print(f"Save {tile_name}:")
-        print(f"    num images of: {len(images_tile_dict)}", f"    num points: {len(points3D_tile_dict)}")
-        output_tile = os.path.join(output_path, f"{tile_name}/sparse/0")
-        os.makedirs(output_tile, exist_ok=True)
-        write_model(cameras, images_tile_dict, points3D_tile_dict, path=output_tile, ext=output_format)
-
-        # write box for merge
-        box = tile['box']
-        with open(os.path.join(output_path, f"{tile_name}/box.txt"), 'w') as f:
-            f.write(f"mx Mx my My mz Mz")
-            f.write(f"{box[0]} {box[1]} {box[2]} {box[3]} {box[4]} {box[5]}")
-
-        # copy images
-        image_path = os.path.join(output_path, f"{tile_name}/images")
-        if os.path.exists(image_path): shutil.rmtree(image_path)
-        os.makedirs(image_path, exist_ok=True)
-        for img in images_tile:
-            orig_path = os.path.join(scene_path, 'images', img.name)
-            new_path = os.path.join(image_path, img.name)
-            shutil.copy(orig_path, new_path)
-            

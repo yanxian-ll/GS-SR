@@ -41,7 +41,7 @@ def eval_load_gaussians(config: cfg.TrainerConfig, scene: Scene) -> Path:
     return load_path
 
 
-def eval_setup(config_path: Path) -> Tuple[cfg.Config, Scene, Path]:
+def eval_setup(config_path: Path, data_device: str = "cuda") -> Tuple[cfg.Config, Scene, Path]:
     # load save config
     config = yaml.load(config_path.read_text(), Loader=yaml.Loader)
     assert isinstance(config, cfg.Config)
@@ -50,6 +50,7 @@ def eval_setup(config_path: Path) -> Tuple[cfg.Config, Scene, Path]:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # setup scene (which includes the dataloader and gaussians)
+    config.scene.dataloader.device = data_device
     scene = config.scene.setup(source_dir = config.source_path, eval = False, device = device)
     assert isinstance(scene, Scene)
 
@@ -74,8 +75,10 @@ class MeshExtractor:
     depth_trunc: float = -1
     voxel_size: float = -1
     sdf_trunc: float = -1
-    num_cluster: int = 50
+    num_cluster: int = 1
     mesh_res: int = 1024
+
+    data_device: str = "cuda"
 
     def main(self) -> None:
         """Main function."""

@@ -102,10 +102,10 @@ test/
 
 ```bash
 
-python split_scene.py -s ./test/scene -o ./test/scene -m 4 -n 1
+python split_scene.py --source-path ./test/scene
 ```
 
-Where '-m' and '-n' denote the columns and rows of the split scene, respectively. Currently, we need to manually determine m and n based on the scene scope and coordinate system orientation. For the Lower-Campus dataset, m and n are set to '4' and '1', respectively.
+You can manually determine the number of rows (--num-row) and columns (--num-col) for dividing the scene based on the scene range and coordinate system direction. You can also automatically determine the tiling by setting the maximum number of images (--max_num_images) per tile.
 
 <p align="center">
 <img src="./assets/partition.jpeg" width=80% height=80% 
@@ -122,12 +122,10 @@ test/
 │   │   └──aligned/
 │   ├── tile_0000
 │   │   ├── sparse
-│   │   ├── images
-│   │   └── box.txt
+│   │   └── images
 │   ├── tile_0001
 │   │   ├── sparse
-│   │   ├── images
-│   │   └── box.txt
+│   │   └── images
 │   ├── ...
 ...
 ```
@@ -152,23 +150,52 @@ test/
 
 For custom data, process the image sequences using [Colmap](https://colmap.github.io/) to obtain the SfM points and camera poses.
 
-If partitioning is necessary, we recommend using the ```colmap model_orientation_aligner``` to align the coordinate axes of the model.
+If you need to partition the scene, you can use ```colmap model_orientation_aligner``` to automatically align the model’s coordinate axes. However, for large scenes, this process is very time-consuming. Therefore, it is recommended to manually align using [CloudCompare](https://www.cloudcompare.org/).
 
 ## How to Use
 
-### Training
+### Training a small scene
+
+1. training
 
 ```bash
-
 python train.py octree-2dgs --source-path ./test/scene --output-path ./output
 ```
 
-### Extract Mesh
+2. extract mesh
 
 ```bash
-
 python extract_mesh.py --load-config <path to config>
 ```
+
+### Training a large scene
+
+1. training
+
+```bash
+python train_split.py octree-2dgs --source-path ./test/scene --output-path ./output
+```
+
+The output folder structure should be as follows:
+
+```
+output/test/octree-2dgs/timestamp/
+├── config.yml
+├── tile_0000
+│   ├── config.yml
+│   ├── logs
+│   └── pointcloud
+├── ...
+...
+```
+
+2. extract mesh
+
+```bash
+python extract_mesh_split.py --load-config <path to config> --data_device "cpu"
+```
+
+Try importing data to the CPU to avoid out-of-memory issues.
 
 ## Test Results
 
@@ -202,7 +229,6 @@ For detailed commands, please refer to [test.sh](https://github.com/yanxian-ll/G
 - **Rendering Quality**: Methods like Scaffold / Octree-2DGS / PGSR significantly increase PSNR while maintaining similar training speeds.
 
 - **Reconstruction Quality**: These methods ensure more robust training, especially in texture-less and marginal regions of scenes, with minimal deterioration in surface reconstruction quality.
-
 
 
 ### Some suggestions

@@ -120,15 +120,17 @@ class Camera(nn.Module):
 
 
 class MiniCam:
-    def __init__(self, width, height, fovy, fovx, znear, zfar, world_view_transform, full_proj_transform):
-        self.image_width = width
-        self.image_height = height    
-        self.FoVy = fovy
-        self.FoVx = fovx
-        self.znear = znear
-        self.zfar = zfar
-        self.world_view_transform = world_view_transform
-        self.full_proj_transform = full_proj_transform
-        view_inv = torch.inverse(self.world_view_transform)
-        self.camera_center = view_inv[3][:3]
-        
+    def __init__(self, camera: Camera):
+        self.uid = camera.uid
+        self.image_width = camera.image_width
+        self.image_height = camera.image_height
+        self.FoVy = camera.FoVy
+        self.FoVx = camera.FoVx
+        self.znear = camera.znear
+        self.zfar = camera.zfar
+        self.resolution_scale = camera.resolution_scale
+        self.world_view_transform = camera.world_view_transform
+        self.full_proj_transform = camera.full_proj_transform
+        self.projection_matrix = camera.projection_matrix
+        self.camera_center = camera.camera_center
+        self.gt_alpha_mask = camera.gt_alpha_mask

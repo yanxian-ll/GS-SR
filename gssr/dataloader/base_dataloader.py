@@ -4,8 +4,8 @@ from random import randint
 import torch.nn as nn
 from dataclasses import dataclass, field
 from typing import List, Type
-from tqdm import tqdm
 
+from gssr.cameras import MiniCam
 from gssr.configs import base_config as cfg
 from gssr.engine.callbacks import TrainingCallback
 
@@ -66,4 +66,12 @@ class DataLoader(nn.Module):
     def get_training_callbacks(self) -> List[TrainingCallback]:
         """Returns the training callbacks from both the Dataloader and the Model."""
         return []
+    
+    def getMiniTrainData(self, scale=1.0):
+        list_cam = [MiniCam(cam) for cam in self.train_dataset[scale]]
+        return list_cam
+    
+    def getMiniTestData(self, scale=1.0):
+        list_cam = [MiniCam(cam) for cam in self.test_dataset[scale]]
+        return list_cam
     

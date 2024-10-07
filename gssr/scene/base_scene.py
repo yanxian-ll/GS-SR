@@ -26,7 +26,7 @@ class SceneConfig(cfg.InstantiateConfig):
     random_background: bool = False
     scaling_modifier: float = 1.0
 
-    relative_gaussian_dir: str = "point_cloud"
+    # relative_gaussian_dir: str = "point_cloud"
 
 
 class Scene(nn.Module):

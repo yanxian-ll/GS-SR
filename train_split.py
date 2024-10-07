@@ -22,12 +22,11 @@ def main(config: cfg.Config) -> None:
     config.save_config()
     
     for i in range(len(list_tiles)):
-        tile_config = copy.copy(config)
+        tile_config = copy.deepcopy(config)
 
         # update config
         tile_config.trainer.relative_gaussian_dir = Path(list_configs[i] / config.trainer.relative_gaussian_dir)
         tile_config.trainer.relative_ckpt_dir = Path(list_configs[i]/ config.trainer.relative_ckpt_dir)
-        tile_config.trainer.relative_ckpt_dir = Path(list_configs[i] / config.trainer.relative_ckpt_dir)
         tile_config.relative_config_dir = Path(list_configs[i] / config.relative_config_dir)
         tile_config.relative_log_dir = Path(list_configs[i] / config.relative_log_dir)
 

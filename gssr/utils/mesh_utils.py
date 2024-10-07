@@ -74,6 +74,20 @@ def to_cam_open3d(viewpoint_stack):
 
     return camera_traj
 
+def estimate_bounding_sphere(viewpoint_stack):
+    """
+    Estimate the bounding sphere given camera pose
+    """
+    torch.cuda.empty_cache()
+    c2ws = np.array([np.linalg.inv(np.asarray((cam.world_view_transform.T).cpu().numpy())) for cam in viewpoint_stack])
+    poses = c2ws[:,:3,:] @ np.diag([1, -1, -1, 1])
+    center = (focus_point_fn(poses))
+    radius = np.linalg.norm(c2ws[:,:3,3] - center, axis=-1).min()
+    center = torch.from_numpy(center).float().cuda()
+    CONSOLE.log(f"The estimated bounding radius is {radius:.2f}")
+    CONSOLE.log(f"Use at least {2.0 * radius:.2f} for depth_trunc")
+    return radius, center
+
 
 class GaussianExtractor(object):
     def __init__(self, render):
@@ -105,14 +119,14 @@ class GaussianExtractor(object):
             self.rgbmaps.append(rgb.cpu())
             self.depthmaps.append(depth.cpu())
             self.normals.append(normal.cpu())
-        self.estimate_bounding_sphere()
+        self.radius, self.center = estimate_bounding_sphere(self.viewpoint_stack)
 
-    def estimate_bounding_sphere(self):
+    def estimate_bounding_sphere(self, viewpoint_stack):
         """
         Estimate the bounding sphere given camera pose
         """
         torch.cuda.empty_cache()
-        c2ws = np.array([np.linalg.inv(np.asarray((cam.world_view_transform.T).cpu().numpy())) for cam in self.viewpoint_stack])
+        c2ws = np.array([np.linalg.inv(np.asarray((cam.world_view_transform.T).cpu().numpy())) for cam in viewpoint_stack])
         poses = c2ws[:,:3,:] @ np.diag([1, -1, -1, 1])
         center = (focus_point_fn(poses))
         self.radius = np.linalg.norm(c2ws[:,:3,3] - center, axis=-1).min()
