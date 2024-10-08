@@ -92,15 +92,17 @@ class MeshExtractor_(MeshExtractor):
             color_type=o3d.pipelines.integration.TSDFVolumeColorType.RGB8
         )
 
-        list_cames = to_cam_open3d(list_cames)
-        for i in tqdm(range(len(list_cames)), desc="TSDF integration progress"):
+        list_cames_o3d = to_cam_open3d(list_cames)
+        num_cameras = len(list_cames)
+        for i in tqdm(range(num_cameras), desc="TSDF integration progress"):
             rgb = list_rgbs.pop()
             depth = list_depths.pop()
-            cam_o3d = list_cames.pop()
+            cam_o3d = list_cames_o3d.pop()
+            cam = list_cames.pop()
             
             # if we have mask provided, use it
-            if list_cames[i].gt_alpha_mask is not None:
-                depth[(list_cames[i].gt_alpha_mask < 0.5)] = 0
+            if cam.gt_alpha_mask is not None:
+                depth[(cam.gt_alpha_mask < 0.5)] = 0
 
             # make open3d rgbd
             rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(
@@ -113,7 +115,7 @@ class MeshExtractor_(MeshExtractor):
         
         name = 'fuse.ply'
         mesh = volume.extract_triangle_mesh()
-        del volume, list_cames, list_depths, list_rgbs
+        del volume, list_cames_o3d, list_cames, list_depths, list_rgbs
         o3d.io.write_triangle_mesh(os.path.join(train_dir, name), mesh)
         CONSOLE.log("mesh saved at {}".format(os.path.join(train_dir, name)))
 
