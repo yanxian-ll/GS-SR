@@ -9,6 +9,7 @@ import os
 import numpy as np
 from tqdm import tqdm
 import open3d as o3d
+import gc
 
 
 from extract_mesh import MeshExtractor, cfg, eval_setup
@@ -74,6 +75,7 @@ class MeshExtractor_(MeshExtractor):
             list_cames = list_cames + valid_cam
             torch.cuda.empty_cache()
             del scene, gaussExtractor
+            gc.collect()
 
         # setup TSDF-fusion parameter
         radius, center = estimate_bounding_sphere(list_cames)
@@ -116,6 +118,7 @@ class MeshExtractor_(MeshExtractor):
         name = 'fuse.ply'
         mesh = volume.extract_triangle_mesh()
         del volume, list_cames_o3d, list_cames, list_depths, list_rgbs
+        gc.collect()
         o3d.io.write_triangle_mesh(os.path.join(train_dir, name), mesh)
         CONSOLE.log("mesh saved at {}".format(os.path.join(train_dir, name)))
 
