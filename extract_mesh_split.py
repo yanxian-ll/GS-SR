@@ -62,7 +62,7 @@ class MeshExtractor_(MeshExtractor):
             valid_cam = []
             for cam in train_cams:
                 center = cam.camera_center.detach().cpu().numpy()
-                if (center[0] > mx) and (center[0] < Mx) and (center[1] > my) and (center[1] < My):
+                if (center[0] >= mx) and (center[0] <= Mx) and (center[1] >= my) and (center[1] <= My):
                     valid_cam.append(cam)
 
             ## setup 
@@ -73,6 +73,7 @@ class MeshExtractor_(MeshExtractor):
             list_depths = list_depths + gaussExtractor.depthmaps
             list_cames = list_cames + valid_cam
             torch.cuda.empty_cache()
+            del scene, gaussExtractor
 
         # setup TSDF-fusion parameter
         radius, center = estimate_bounding_sphere(list_cames)
@@ -91,9 +92,11 @@ class MeshExtractor_(MeshExtractor):
             color_type=o3d.pipelines.integration.TSDFVolumeColorType.RGB8
         )
 
-        for i, cam_o3d in tqdm(enumerate(to_cam_open3d(list_cames)), desc="TSDF integration progress"):
-            rgb = list_rgbs[i]
-            depth = list_depths[i]
+        list_cames = to_cam_open3d(list_cames)
+        for i in tqdm(range(len(list_cames)), desc="TSDF integration progress"):
+            rgb = list_rgbs.pop()
+            depth = list_depths.pop()
+            cam_o3d = list_cames.pop()
             
             # if we have mask provided, use it
             if list_cames[i].gt_alpha_mask is not None:
@@ -110,13 +113,15 @@ class MeshExtractor_(MeshExtractor):
         
         name = 'fuse.ply'
         mesh = volume.extract_triangle_mesh()
+        del volume, list_cames, list_depths, list_rgbs
         o3d.io.write_triangle_mesh(os.path.join(train_dir, name), mesh)
         CONSOLE.log("mesh saved at {}".format(os.path.join(train_dir, name)))
+
         # post-process the mesh and save, saving the largest N clusters
-        mesh = o3d.io.read_triangle_mesh(os.path.join(train_dir, name))
         mesh_post = post_process_mesh(mesh, cluster_to_keep=self.num_cluster)
         o3d.io.write_triangle_mesh(os.path.join(train_dir, name.replace('.ply', '_post.ply')), mesh_post)
         CONSOLE.log("mesh post processed saved at {}".format(os.path.join(train_dir, name.replace('.ply', '_post.ply'))))
+
 
 def entrypoint():
     """Entrypoint for use with pyproject scripts."""
