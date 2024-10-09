@@ -141,7 +141,7 @@ test/
 
 ### Our Test Data:
 
-- The Lower-Campus dataset is available for download from [Baidu Netdisk](https://pan.baidu.com/s/1SwkUAs2HIeTMDX1hzqdPmg?pwd=gssr). This dataset includes raw images, ground truth point clouds, and SFM processed data.
+- The Lower-Campus dataset is available for download from the official address. This dataset includes raw images, ground truth point clouds.
 
 - The CSU-Library dataset can be downloaded from [Baidu Netdisk](https://pan.baidu.com/s/1XeWPyw9v_0d9vJEzv97cJQ?pwd=gssr). This building-level dataset contains over 300 images and features numerous repeated textures and texture-less areas, making it particularly challenging to work with. 
 
