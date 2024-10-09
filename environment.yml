@@ -27,6 +27,16 @@ dependencies:
     - trimesh
     - open3d
     - pytorch3d
+    - matplotlib
+    - mediapy
+    - opencv_python
+    - Pillow
+    - PyYAML
+    - rich
+    - scipy
+    - Shapely
+    - skimage
+    - tyro
     - submodules/diff-gaussian-rasterization
     - submodules/diff-plane-rasterization
     - submodules/diff-surfel-rasterization
