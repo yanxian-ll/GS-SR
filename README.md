@@ -2,10 +2,6 @@
 
 This project aimed to solve the task of surface reconstruction for a large scene.
 
-😭 The project lacked innovation.
-
-😮 It was purely combinatorial work.
-
 😜 Just for fun!!!
 
 We have reorganized the 3DGS pipeline according to [sdfstudio](https://github.com/autonomousvision/sdfstudio) to facilitate the introduction of various surface reconstruction methods. Please use the following command to see the currently supported methods.
