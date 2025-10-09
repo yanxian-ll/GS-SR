@@ -13,6 +13,7 @@ CONSOLE = Console(width=120)
 @dataclass
 class PGSRDataLoaderConfig(ColmapDataLoaderConfig):
     _target: Type = field(default_factory=lambda: PGSRDataLoader)
+    use_mvs_view_selection: bool = False
     num_multi_view: int = 5
     multi_view_max_angle: float = 30.0
     multi_view_min_dis: float = 0.01
@@ -30,7 +31,7 @@ class PGSRDataLoader(ColmapDataLoader):
         if os.path.exists(os.path.join(self.source_dir, 'pair.txt')):
             view_sel = read_pairs(os.path.join(self.source_dir, 'pair.txt'))
 
-        elif os.path.exists(os.path.join(self.source_dir, "sparse")):   # (only support colmap format)
+        elif self.config.use_mvs_view_selection and os.path.exists(os.path.join(self.source_dir, "sparse")):   # (only support colmap format)
             CONSOLE.log("Start View Selection.")
             _, extr_infos, points3d = read_model(os.path.join(self.source_dir, 'sparse/0'))
             list_extr_infos = [extr_infos[cam.colmap_id] for cam in self.train_dataset[1.0]]

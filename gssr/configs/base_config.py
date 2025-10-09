@@ -75,8 +75,8 @@ class MachineConfig(PrintableConfig):
 @dataclass
 class TrainerConfig(PrintableConfig):
     iterations: int = 30_000
-    test_iterations: List[int] = field(default_factory=lambda:[30_000])
-    save_iterations: List[int] = field(default_factory=lambda:[30_000])
+    test_iterations: List[int] = field(default_factory=lambda:[7000, 15_000, 30_000])
+    save_iterations: List[int] = field(default_factory=lambda:[7000, 15_000, 30_000])
     relative_gaussian_dir: Path = Path("point_cloud/")
 
     checkpoint_iterations: List[int] = field(default_factory=list)
@@ -89,6 +89,9 @@ class TrainerConfig(PrintableConfig):
     load_gaussian_dir: Optional[Path] = None
     load_gaussian_step: Optional[int] = None
     load_config: Optional[Path] = None
+
+    # need densify or not
+    densify: bool = True
 
 @dataclass
 class PartitionConfig(PrintableConfig):
@@ -105,8 +108,9 @@ from gssr.scene.base_scene import SceneConfig
 @dataclass
 class Config(PrintableConfig):
     """Full config contents"""
-
     source_path: Optional[str] = None
+    # source_path: Optional[str] = "/home/csuzhang/disk/myCode/optical-flow/SatCorrect/data/JAX_214"
+
     output_path: str = "./output"
     method_name: Optional[str] = None # required
     experiment_name: Optional[str] = None

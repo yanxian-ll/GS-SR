@@ -214,7 +214,7 @@ class OctreeGaussian(ScaffoldGaussian):
         return anchor_positions[weed_mask], anchor_levels[weed_mask], mean_visible, weed_mask
 
     def create_from_data(self, pcd: BasicPointCloud, cameras: Dict, spatial_lr_scale: float):
-        points = torch.tensor(pcd.points[::self.config.sampling_ratio]).float().to(self.device)
+        points = torch.tensor(pcd.points[::self.config.sampling_interval]).float().to(self.device)
         scales = list(cameras.keys())
         self.set_level(points, cameras, scales)
 
@@ -308,6 +308,61 @@ class OctreeGaussian(ScaffoldGaussian):
         elements[:] = list(map(tuple, attributes))
         el = PlyElement.describe(elements, 'vertex')
         PlyData([el]).write(path)
+    
+
+    def save_mlp_checkpoints(self, path):
+        if self.config.save_ckpt_mode == 'split':
+            self.mlp_opacity.eval()
+            opacity_mlp = torch.jit.trace(self.mlp_opacity, (torch.rand(1, self.feat_dim+self.view_dim+self.opacity_dist_dim+self.level_dim).cuda()))
+            opacity_mlp.save(os.path.join(path, 'opacity_mlp.pt'))
+            self.mlp_opacity.train()
+
+            self.mlp_cov.eval()
+            cov_mlp = torch.jit.trace(self.mlp_cov, (torch.rand(1, self.feat_dim+self.view_dim+self.cov_dist_dim+self.level_dim).cuda()))
+            cov_mlp.save(os.path.join(path, 'cov_mlp.pt'))
+            self.mlp_cov.train()
+
+            self.mlp_color.eval()
+            color_mlp = torch.jit.trace(self.mlp_color, (torch.rand(1, self.feat_dim+self.view_dim+self.color_dist_dim+self.appearance_dim+self.level_dim).cuda()))
+            color_mlp.save(os.path.join(path, 'color_mlp.pt'))
+            self.mlp_color.train()
+
+            if self.use_feat_bank:
+                self.mlp_feature_bank.eval()
+                feature_bank_mlp = torch.jit.trace(self.mlp_feature_bank, (torch.rand(1, self.view_dim+self.level_dim).cuda()))
+                feature_bank_mlp.save(os.path.join(path, 'feature_bank_mlp.pt'))
+                self.mlp_feature_bank.train()
+
+            if self.appearance_dim:
+                self.embedding_appearance.eval()
+                emd = torch.jit.trace(self.embedding_appearance, (torch.zeros((1,), dtype=torch.long).cuda()))
+                emd.save(os.path.join(path, 'embedding_appearance.pt'))
+                self.embedding_appearance.train()
+
+        elif self.config.save_ckpt_mode == 'unite':
+            if self.use_feat_bank:
+                torch.save({
+                    'opacity_mlp': self.mlp_opacity.state_dict(),
+                    'cov_mlp': self.mlp_cov.state_dict(),
+                    'color_mlp': self.mlp_color.state_dict(),
+                    'feature_bank_mlp': self.mlp_feature_bank.state_dict(),
+                    'appearance': self.embedding_appearance.state_dict()
+                    }, os.path.join(path, 'checkpoints.pth'))
+            elif self.appearance_dim > 0:
+                torch.save({
+                    'opacity_mlp': self.mlp_opacity.state_dict(),
+                    'cov_mlp': self.mlp_cov.state_dict(),
+                    'color_mlp': self.mlp_color.state_dict(),
+                    'appearance': self.embedding_appearance.state_dict()
+                    }, os.path.join(path, 'checkpoints.pth'))
+            else:
+                torch.save({
+                    'opacity_mlp': self.mlp_opacity.state_dict(),
+                    'cov_mlp': self.mlp_cov.state_dict(),
+                    'color_mlp': self.mlp_color.state_dict(),
+                    }, os.path.join(path, 'checkpoints.pth'))
+        else:
+            raise NotImplementedError
 
     def plot_levels(self):
         for level in range(self.levels):

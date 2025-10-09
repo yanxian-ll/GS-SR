@@ -113,12 +113,18 @@ class GaussianExtractor(object):
         self.viewpoint_stack = viewpoint_stack
         for i, viewpoint_cam in tqdm(enumerate(self.viewpoint_stack), desc="reconstruct radiance fields"):
             render_pkg = self.render(viewpoint_cam)
+
             rgb = render_pkg['render']
-            normal = torch.nn.functional.normalize(render_pkg['normal'], dim=0)
-            depth = render_pkg['depth']
             self.rgbmaps.append(rgb.cpu())
-            self.depthmaps.append(depth.cpu())
-            self.normals.append(normal.cpu())
+
+            if 'normal' in render_pkg:
+                normal = torch.nn.functional.normalize(render_pkg['normal'], dim=0)
+                self.normals.append(normal.cpu())
+            
+            if 'depth' in render_pkg:
+                depth = render_pkg['depth']
+                self.depthmaps.append(depth.cpu())
+            
         self.radius, self.center = estimate_bounding_sphere(self.viewpoint_stack)
 
     def estimate_bounding_sphere(self, viewpoint_stack):
@@ -282,18 +288,24 @@ class GaussianExtractor(object):
         gts_path = os.path.join(path, "gt")
         vis_path = os.path.join(path, "vis")
         os.makedirs(render_path, exist_ok=True)
-        os.makedirs(vis_path, exist_ok=True)
         os.makedirs(gts_path, exist_ok=True)
 
-        depth_frame = self.depthmaps[0][0].cpu().numpy()
-        p=3
-        distance_limits = np.percentile(depth_frame.flatten(), [p, 100 - p])
-        lo, hi = [np.log(x) for x in distance_limits]
+        if len(self.depthmaps) > 0 or len(self.normals) > 0:
+            os.makedirs(vis_path, exist_ok=True)
+
+        if len(self.depthmaps) > 0:
+            depth_frame = self.depthmaps[0][0].cpu().numpy()
+            p=3
+            distance_limits = np.percentile(depth_frame.flatten(), [p, 100 - p])
+            lo, hi = [np.log(x) for x in distance_limits]
 
         for idx, viewpoint_cam in tqdm(enumerate(self.viewpoint_stack), desc="export images"):
             gt = viewpoint_cam.original_image[0:3, :, :]
             save_img_u8(gt.permute(1,2,0).cpu().numpy(), os.path.join(gts_path, '{0:05d}'.format(idx) + ".png"))
             save_img_u8(self.rgbmaps[idx].permute(1,2,0).cpu().numpy(), os.path.join(render_path, '{0:05d}'.format(idx) + ".png"))
-            save_img_f32(self.depthmaps[idx][0].cpu().numpy(), os.path.join(vis_path, 'depth_{0:05d}'.format(idx) + ".tiff"))
-            save_img_u8(self.normals[idx].permute(1,2,0).cpu().numpy() * 0.5 + 0.5, os.path.join(vis_path, 'normal_{0:05d}'.format(idx) + ".png"))
-            save_vis_depth(self.depthmaps[idx][0].cpu().numpy(), lo, hi, os.path.join(vis_path, 'depth_vis_{0:05d}'.format(idx) + ".png"))
+
+            if len(self.depthmaps) > 0:
+                save_img_f32(self.depthmaps[idx][0].cpu().numpy(), os.path.join(vis_path, 'depth_{0:05d}'.format(idx) + ".tiff"))
+                save_vis_depth(self.depthmaps[idx][0].cpu().numpy(), lo, hi, os.path.join(vis_path, 'depth_vis_{0:05d}'.format(idx) + ".png"))
+            if len(self.normals) > 0:
+                save_img_u8(self.normals[idx].permute(1,2,0).cpu().numpy() * 0.5 + 0.5, os.path.join(vis_path, 'normal_{0:05d}'.format(idx) + ".png"))

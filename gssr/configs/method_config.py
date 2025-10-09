@@ -22,6 +22,7 @@ import tyro
 from gssr.configs.base_config import Config
 from gssr.dataloader.colmap_dataloader import ColmapDataLoaderConfig
 from gssr.dataloader.pgsr_dataloader import PGSRDataLoaderConfig
+from gssr.dataloader.satellite_dataloader import SatelliteDataLoaderConfig
 
 from gssr.scene.vanilla_scene import VanillaSceneConfig
 from gssr.scene.twodgs_scene import TwoDGSSceneConfig
@@ -53,6 +54,9 @@ descriptions = {
     "pgsr": "Implementation of PGSR",
     "scaffold-pgsr": "Implementation of Scafflod-GS + PGSR",
     "octree-pgsr"  : "Implementation of Octree-GS + PGSR",
+
+    "satellite-3dgs": "Implementation of satellite 3DGS",
+    "satellite-2dgs": "Implementation of satellite 2DGS",
 }
 
 method_configs["3dgs"] = Config(
@@ -79,9 +83,7 @@ method_configs["2dgs"] = Config(
     scene=TwoDGSSceneConfig(
         dataloader=ColmapDataLoaderConfig(),
         gaussians=TwoDGaussianConfig(),
-        depth_ratio = 0.0,
         lambda_normal = 0.05,
-        lambda_dist = 0.0,
     )
 )
 
@@ -140,6 +142,116 @@ method_configs["octree-pgsr"] = Config(
         dataloader=PGSRDataLoaderConfig(),
         gaussians=OctreeGaussianConfig(),
     )
+)
+
+
+
+
+
+method_configs["satellite-3dgs"] = Config(
+    method_name="satellite-3dgs",
+    scene=VanillaSceneConfig(
+        dataloader=SatelliteDataLoaderConfig(),
+        gaussians=VanillaGaussianConfig(),
+        lambda_dssim=0.2
+    )
+)
+
+method_configs["satellite-2dgs"] = Config(
+    method_name="satellite-2dgs",
+    scene=TwoDGSSceneConfig(
+        dataloader=SatelliteDataLoaderConfig(),
+        gaussians=TwoDGaussianConfig(),
+        lambda_normal = 0.05,
+    )
+)
+
+method_configs["satellite-pgsr"] = Config(
+    method_name="satellite-pgsr",
+    scene=PGSRSceneConfig(
+        dataloader=SatelliteDataLoaderConfig(),
+        gaussians=PGSRGaussianConfig(),
+    )
+)
+
+
+### Our method
+from gssr.gaussian.satellite_scaffold_gaussian import SatelliteScaffoldGaussianConfig
+
+from gssr.scene.satellite_scaffold_scene import SatelliteScaffoldSceneConfig
+from gssr.scene.satellite_scaffold_2dgs_scene import SatelliteScaffold2DGSSceneConfig
+
+method_configs["satellite-scaffold-gs"] = Config(
+    method_name="satellite-scaffold-gs",
+    scene=SatelliteScaffoldSceneConfig(
+        dataloader=SatelliteDataLoaderConfig(),
+        gaussians=SatelliteScaffoldGaussianConfig(
+            
+            add_opacity_dist = False,
+            add_cov_dist = False,
+            add_color_dist = False,
+        ),
+        lambda_scaling = 0.01,
+    ),
+)
+
+
+method_configs["satellite-scaffold-2dgs"] = Config(
+    method_name="satellite-scaffold-2dgs",
+    scene=SatelliteScaffold2DGSSceneConfig(
+        dataloader=SatelliteDataLoaderConfig(),
+        gaussians=SatelliteScaffoldGaussianConfig(
+            
+            add_opacity_dist = False,
+            add_cov_dist = False,
+            add_color_dist = False,
+        ),
+        lambda_scaling = 0.01,
+    ),
+)
+####
+
+
+# method_configs["satellite-scaffold-2dgs"] = Config(
+#     method_name="satellite-scaffold-2dgs",
+#     scene=Scaffold2DGSSceneConfig(
+#         dataloader=SatelliteDataLoaderConfig(),
+#         gaussians=ScaffoldGaussianConfig(
+            
+#             add_opacity_dist = False,
+#             add_cov_dist = False,
+#             add_color_dist = False,
+#         ),
+#         lambda_scaling = 0.01,
+#     ),
+# )
+
+method_configs["satellite-scaffold-pgsr"] = Config(
+    method_name="satellite-scaffold-pgsr",
+    scene=ScaffoldPGSRSceneConfig(
+        dataloader=SatelliteDataLoaderConfig(),
+        gaussians=ScaffoldGaussianConfig(
+            
+            add_opacity_dist = False,
+            add_cov_dist = False,
+            add_color_dist = False,
+        ),
+        lambda_scaling = 0.01,
+    ),
+)
+
+method_configs["satellite-octree-2dgs"] = Config(
+    method_name="satellite-octree-2dgs",
+    scene=Octree2DGSSceneConfig(
+        dataloader=SatelliteDataLoaderConfig(),
+        gaussians=OctreeGaussianConfig(
+            
+            add_opacity_dist = False,
+            add_cov_dist = False,
+            add_color_dist = False,
+        ),
+        lambda_scaling = 0.01,
+    ),
 )
 
 AnnotatedBaseConfigUnion = tyro.conf.SuppressFixed[  # Don't show unparseable (fixed) arguments in helptext.

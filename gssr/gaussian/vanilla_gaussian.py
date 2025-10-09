@@ -89,11 +89,22 @@ class VanillaGaussian(GaussianModel):
         self.inverse_opacity_activation = inverse_sigmoid
         self.rotation_activation = torch.nn.functional.normalize
 
+        def build_covariance_from_scaling_rotation(scaling, scaling_modifier, rotation):
+            L = build_scaling_rotation(scaling_modifier * scaling, rotation)
+            actual_covariance = L @ L.transpose(1, 2)
+            symm = strip_symmetric(actual_covariance)
+            return symm
+        self.covariance_activation = build_covariance_from_scaling_rotation
+
+    def get_covariance(self, scaling_modifier = 1):
+        return self.covariance_activation(self.get_scaling, scaling_modifier, self._rotation)
+
+
     def create_from_data(self, pcd : BasicPointCloud, cameras : Dict, spatial_lr_scale : float):
         self.spatial_lr_scale = spatial_lr_scale
 
-        points = pcd.points[::self.config.sampling_ratio]
-        colors = pcd.colors[::self.config.sampling_ratio]
+        points = pcd.points[::self.config.sampling_interval]
+        colors = pcd.colors[::self.config.sampling_interval]
 
         fused_point_cloud = torch.tensor(np.asarray(points)).float().cuda()
         fused_color = RGB2SH(torch.tensor(np.asarray(colors)).float().cuda())

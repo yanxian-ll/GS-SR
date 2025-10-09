@@ -35,7 +35,7 @@ class OctreePGSRScene(PGSRScene, OctreeScene):
         ## render near camera
         near_model_outputs = None
         near_cam = None
-        if step > 7000:
+        if step > self.config.start_multi_view_loss_iter:
             near_cam = None if len(viewpoint_cam.near_ids) == 0 else self.dataloader.getTrainData()[random.sample(viewpoint_cam.near_ids, 1)[0]]
             self._gaussians.set_anchor_mask(near_cam.camera_center, step, near_cam.resolution_scale)
             means3D, opacity, scales, rotations, cov3D_precomp, shs, colors_precomp, other_output = self.generate_gaussians(near_cam)

@@ -34,7 +34,8 @@ class CameraInfo():
 
 class Camera(nn.Module):
     def __init__(self, colmap_id, R, T, FoVx, FoVy, image, gt_alpha_mask,
-                 image_name, uid, resolution_scale,
+                 image_name, uid, resolution_scale=1.0,
+                 zfar =100.0, znear=0.01,
                  trans=np.array([0.0, 0.0, 0.0]), 
                  scale=1.0, data_device="cuda"
                  ):
@@ -76,8 +77,8 @@ class Camera(nn.Module):
             self.original_image *= torch.ones((1, self.image_height, self.image_width), device=self.data_device)
             self.gt_alpha_mask = None
 
-        self.zfar = 100.0
-        self.znear = 0.01
+        self.zfar = zfar
+        self.znear = znear
 
         self.trans = trans
         self.scale = scale
@@ -90,7 +91,7 @@ class Camera(nn.Module):
     # copied from PGSR
     def get_calib_matrix_nerf(self, scale=1.0):
         intrinsic_matrix = torch.tensor([[self.Fx/scale, 0, self.Cx/scale], [0, self.Fy/scale, self.Cy/scale], [0, 0, 1]]).float()
-        extrinsic_matrix = self.world_view_transform.transpose(0,1).contiguous() # cam2world
+        extrinsic_matrix = self.world_view_transform.transpose(0,1).contiguous()  # world2cam
         return intrinsic_matrix, extrinsic_matrix
     
     # copied from PGSR
@@ -134,3 +135,140 @@ class MiniCam:
         self.projection_matrix = camera.projection_matrix
         self.camera_center = camera.camera_center
         self.gt_alpha_mask = camera.gt_alpha_mask
+
+
+class OrthoCamera(Camera):
+    def __init__(self, colmap_id, R, T, FoVx, FoVy, image, gt_alpha_mask, image_name, uid, bbx, resolution_scale=1.0, zfar=100, znear=0.01, trans=np.array([0, 0, 0]), scale=1, data_device="cuda"):
+        super().__init__(colmap_id, R, T, FoVx, FoVy, image, gt_alpha_mask, image_name, uid, resolution_scale, zfar, znear, trans, scale, data_device)
+        self.bbx = bbx
+        mx, Mx, my, My = bbx[0], bbx[1], bbx[2], bbx[3]
+        self.ground_width = Mx - mx
+        self.ground_height = My - my
+        
+        self.ortho_view = torch.tensor([1, 1, -1], dtype=torch.float32).cuda()
+
+        # update Projection-Matrix & Full-proj-transform
+        self.projection_matrix = torch.tensor([
+            [2/(Mx-mx), 0, 0, 0],
+            [0, 2/(My-my), 0, 0],
+            [0, 0, 1, 0],
+            [0, 0, 0, 1]], dtype=torch.float32).transpose(0,1).cuda()
+        self.full_proj_transform = (self.world_view_transform.unsqueeze(0).bmm(self.projection_matrix.unsqueeze(0))).squeeze(0)
+
+
+class SunCamera2(Camera):
+    def __init__(self, colmap_id, R, T, FoVx, FoVy, dx, dy, image, gt_alpha_mask, image_name, uid, resolution_scale=1, zfar=100, znear=0.01, trans=np.array([0, 0, 0]), scale=1, data_device="cuda"):
+        super().__init__(colmap_id, R, T, FoVx, FoVy, image, gt_alpha_mask, image_name, uid, resolution_scale, zfar, znear, trans, scale, data_device)
+        self.ground_width = dx
+        self.ground_height = dy
+
+        self.projection_matrix = torch.tensor([
+            [2/dx, 0, 0, 0],
+            [0, 2/dy, 0, 0],
+            [0, 0, 1, 0],
+            [0, 0, 0, 1]], dtype=torch.float32).transpose(0,1).cuda()
+        self.full_proj_transform = (self.world_view_transform.unsqueeze(0).bmm(self.projection_matrix.unsqueeze(0))).squeeze(0)
+
+
+class SunCamera(Camera):
+    def __init__(self, uid, gsd, scene_bbx, sun_view, sun_dist=1e6):
+        self.uid = uid
+
+        ## Rotation and Translation
+        sun_view = sun_view / np.linalg.norm(sun_view)
+        sun_position = sun_view * sun_dist
+
+        self.sun_view = torch.tensor(sun_view, dtype=torch.float32).cuda()
+        self.sun_position = torch.tensor(sun_position, dtype=torch.float32).cuda()
+
+        z_axis = -sun_view
+        if np.isclose(np.abs(z_axis[1]), 1.0):
+            up = np.array([1, 0, 0])
+        else:
+            up = np.array([0, 1, 0])
+
+        x_axis = np.cross(up, z_axis)
+        x_axis /= np.linalg.norm(x_axis)
+        y_axis = np.cross(z_axis, x_axis)
+
+        R = np.stack((x_axis, y_axis, z_axis), axis=1)
+        c2w = np.eye(4)
+        c2w[:3, :3] = R
+        c2w[:3, -1] = sun_position
+        w2c = np.linalg.inv(c2w)
+        self.R = w2c[:3, :3].T
+        self.T = w2c[:3, -1]
+
+        ## bbx, compute dx dy
+        mx = scene_bbx[0]
+        my = scene_bbx[1]
+        w = scene_bbx[2]
+        h = scene_bbx[3]
+        corner_points = np.array([
+            [mx, my, 0.0, 1.0],
+            [mx, my+h, 0.0, 1.0],
+            [mx+w, my, 0.0, 1.0],
+            [mx+w, my+h, 0.0, 1.0]
+        ])
+        corner_points_ic = (w2c @ corner_points.T).T[:, :3]
+        dx = np.max(corner_points_ic[:,0]) - np.min(corner_points_ic[:,0])
+        dy = np.max(corner_points_ic[:,1]) - np.min(corner_points_ic[:,1])
+
+        self.image_width = int(dx / gsd + 0.5)
+        self.image_height = int(dy / gsd + 0.5)
+
+        if self.image_width > 1600:
+            self.image_width = 1600
+            dx = self.image_width * gsd
+        if self.image_height > 1600:
+            self.image_height = 1600
+            dy = self.image_height * gsd
+
+        h = np.sqrt((sun_position ** 2).sum())
+        self.Fx = h / gsd
+        self.Fy = h / gsd
+
+        self.FoVx = focal2fov(self.Fx, self.image_width)
+        self.FoVy = focal2fov(self.Fy, self.image_height)
+
+        self.ground_width = dx
+        self.ground_height = dy
+
+        self.world_view_transform = torch.tensor(getWorld2View2(self.R, self.T)).transpose(0, 1).cuda()
+        self.projection_matrix = torch.tensor([
+            [2/dx, 0, 0, 0],
+            [0, 2/dy, 0, 0],
+            [0, 0, 1, 0],
+            [0, 0, 0, 1]], dtype=torch.float32).transpose(0,1).cuda()
+        self.full_proj_transform = (self.world_view_transform.unsqueeze(0).bmm(self.projection_matrix.unsqueeze(0))).squeeze(0)
+        self.camera_center = self.world_view_transform.inverse()[3, :3]
+
+
+class SatelliteCamera(Camera):
+    def __init__(self, colmap_id, R, T, FoVx, FoVy, image, gt_alpha_mask, image_name, uid, 
+                 mean_alt, scene_bbx, sun_view, sun_dist,
+                 resolution_scale=1, zfar=100, znear=0.01, trans=np.array([0, 0, 0]), scale=1, data_device="cuda"):
+        super().__init__(colmap_id, R, T, FoVx, FoVy, image, gt_alpha_mask, image_name, uid, resolution_scale, zfar, znear, trans, scale, data_device)
+        
+        self.mean_alt = mean_alt
+        
+        self.fx_z0 = self.Fx / self.mean_alt
+        self.fy_z0 = self.Fy / self.mean_alt
+
+        # setup suncamera
+        self.sun_camera = SunCamera(
+            uid=self.uid,
+            gsd=(1.0/self.fx_z0 + 1.0/self.fy_z0)/2.0,
+            scene_bbx=scene_bbx,
+            sun_view=sun_view,
+            sun_dist=sun_dist
+        )
+
+
+        # self.projection_matrix = torch.tensor([
+        #     [self.fx_z0 * (2 / self.image_width), 0, 0, 0],
+        #     [0, self.fy_z0 * (2 / self.image_height), 0, 0],
+        #     # [0, 0, 1, -self.mean_alt + 100.0],
+        #     [0, 0, 1, 0],
+        #     [0, 0, 0, 1]], dtype=torch.float32).transpose(0,1).cuda()
+        # self.full_proj_transform = (self.world_view_transform.unsqueeze(0).bmm(self.projection_matrix.unsqueeze(0))).squeeze(0)

@@ -93,7 +93,8 @@ def readColmapSceneInfo(path, images, eval, llffhold=8):
         train_cam_infos = cam_infos
         test_cam_infos = []
     
-    nerf_normalization = getNerfppNorm(train_cam_infos)
+    # nerf_normalization = getNerfppNorm(train_cam_infos)
+    nerf_normalization = {}
 
     ply_path = os.path.join(path, "sparse/0/points3D.ply")
     if not os.path.exists(ply_path):
@@ -120,6 +121,16 @@ def readColmapSceneInfo(path, images, eval, llffhold=8):
 @dataclass
 class ColmapDataLoaderConfig(DataLoaderConfig):
     _target: Type = field(default_factory=lambda: ColmapDataLoader)
+    # scale scene
+    scale_scene: bool = True
+    scene_scale: float = None
+    scene_percent: float = 0.2
+    # translate
+    t_x: float = None
+    t_y: float = None
+    t_z: float = None
+    # sampling
+    sampling_ratio: float = -1
 
 class ColmapDataLoader(DataLoader):
     config: ColmapDataLoaderConfig
@@ -140,7 +151,59 @@ class ColmapDataLoader(DataLoader):
             random.shuffle(scene_info.train_cameras)  # Multi-res consistent random shuffling
             random.shuffle(scene_info.test_cameras)  # Multi-res consistent random shuffling
         
+        # scale scene, if needed
+        if self.config.scale_scene:
+            points = scene_info.point_cloud.points
+
+            if self.config.scene_scale is None and self.config.t_x is None and self.config.t_y is None and self.config.t_z is None:
+                mp = np.mean(points, axis=0)
+                tx, ty, tz = mp[0], mp[1], mp[2]
+                self.config.t_x = tx
+                self.config.t_y = ty
+                self.config.t_z = tz
+                q = int((1 - self.config.scene_percent) / 2 * 100)
+                Mp = np.percentile(points, q=100-q, axis=0)
+                mp = np.percentile(points, q=q, axis=0)
+                self.config.scene_scale = (Mp[0]-mp[0] + Mp[1]-mp[1]) / 2.0
+
+            print(f"translate the scene, tx={self.config.t_x}, ty={self.config.t_y}, tz={self.config.t_z}")
+            points = points - np.array([self.config.t_x, self.config.t_y, self.config.t_z]).reshape(1,3)
+            print(f"scale the scene, scale={self.config.scene_scale}")
+            scene_info.point_cloud.points = points / self.config.scene_scale
+            
+            camera_list = []
+            for id, c in enumerate(scene_info.train_cameras):
+                new_T = c.T + (c.R.T @ np.array([self.config.t_x, self.config.t_y, self.config.t_z]).reshape(3,1)).reshape(3)
+                camera_list.append(CameraInfo(uid=c.uid, R=c.R, T=new_T / self.config.scene_scale, 
+                                              FovY=c.FovY, FovX=c.FovX, image=c.image, 
+                                              image_path=c.image_path, image_name=c.image_name, 
+                                              width=c.width, height=c.height))
+            scene_info.train_cameras = camera_list.copy()
+
+            camera_list = []
+            for id, c in enumerate(scene_info.test_cameras):
+                new_T = c.T + (c.R.T @ np.array([self.config.t_x, self.config.t_y, self.config.t_z]).reshape(3,1)).reshape(3)
+                camera_list.append(CameraInfo(uid=c.uid, R=c.R, T=new_T / self.config.scene_scale, 
+                                              FovY=c.FovY, FovX=c.FovX, image=c.image,
+                                              image_path=c.image_path, image_name=c.image_name, 
+                                              width=c.width, height=c.height))
+            scene_info.test_cameras = camera_list.copy()
+        
+        # after scale the scene, then compute nerf_normalization
+        scene_info.nerf_normalization = getNerfppNorm(scene_info.train_cameras)
+        
         self.cameras_extent = scene_info.nerf_normalization["radius"]
+
+        # samling
+        if self.config.sampling_ratio > 0.0 and self.config.sampling_ratio < 1.0:
+            points = scene_info.point_cloud.points
+            colors = scene_info.point_cloud.colors
+            normals = scene_info.point_cloud.normals
+            indices = np.random.choice(points.shape[0], int(points.shape[0]*self.config.sampling_ratio), replace=False)
+            scene_info.point_cloud.points = points[indices]
+            scene_info.point_cloud.colors = colors[indices]
+            scene_info.point_cloud.normals = normals[indices]
+
         self.point_cloud = scene_info.point_cloud
 
         for resolution_scale in self.config.resolution_scales:
@@ -148,4 +211,4 @@ class ColmapDataLoader(DataLoader):
             self.train_dataset[resolution_scale] = cameraList_from_camInfos(scene_info.train_cameras, resolution_scale, self.config.resolution, self.config.device)
             print("Loading Test Data")
             self.test_dataset[resolution_scale] = cameraList_from_camInfos(scene_info.test_cameras, resolution_scale, self.config.resolution, self.config.device)
-    
+        

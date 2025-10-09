@@ -26,7 +26,8 @@ class ScaffoldGaussianConfig(VanillaGaussianConfig):
 
     feat_dim: int = 32
     n_offsets: int = 10
-    voxel_size: float = 0.001  # if voxel_size<=0, using 1nn dist
+    # voxel_size: float = 0.001  # if voxel_size<=0, using 1nn dist
+    voxel_size: float = 0.0  # if voxel_size<=0, using 1nn dist
     update_depth: int = 3
     update_init_factor: int = 16
     update_hierachy_factor: int = 4
@@ -181,7 +182,7 @@ class ScaffoldGaussian(VanillaGaussian):
         return (
             self._anchor,
             self._offset,
-            self._local,
+            # self._local,
             self._scaling,
             self._rotation,
             self._opacity,
@@ -195,7 +196,7 @@ class ScaffoldGaussian(VanillaGaussian):
         (self.active_sh_degree, 
         self._anchor, 
         self._offset,
-        self._local,
+        # self._local,
         self._scaling, 
         self._rotation, 
         self._opacity,
@@ -261,7 +262,7 @@ class ScaffoldGaussian(VanillaGaussian):
     
     def create_from_data(self, pcd: BasicPointCloud, cameras: Dict, spatial_lr_scale: float):
         self.spatial_lr_scale = spatial_lr_scale
-        points = pcd.points[::self.config.sampling_ratio]
+        points = pcd.points[::self.config.sampling_interval]
 
         if self.voxel_size <= 0:
             init_points = torch.tensor(points).float().cuda()
@@ -453,6 +454,8 @@ class ScaffoldGaussian(VanillaGaussian):
 
         self._offset = nn.Parameter(torch.tensor(offsets, dtype=torch.float, device="cuda").transpose(1, 2).contiguous().requires_grad_(True))
         self._anchor = nn.Parameter(torch.tensor(anchor, dtype=torch.float, device="cuda").requires_grad_(True))
+        self._xyz = self._anchor   # used for ortho-rendering
+
         self._opacity = nn.Parameter(torch.tensor(opacities, dtype=torch.float, device="cuda").requires_grad_(True))
         self._scaling = nn.Parameter(torch.tensor(scales, dtype=torch.float, device="cuda").requires_grad_(True))
         self._rotation = nn.Parameter(torch.tensor(rots, dtype=torch.float, device="cuda").requires_grad_(True))

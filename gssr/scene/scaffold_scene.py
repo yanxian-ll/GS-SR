@@ -192,3 +192,110 @@ class ScaffoldScene(VanillaScene):
         model_outputs.update(other_output)
         return model_outputs
     
+    @torch.no_grad()
+    def generate_ortho_neural_gaussians(self, viewpoint_camera, visible_mask=None, is_training=False):
+        ## view frustum filtering for acceleration    
+        if visible_mask is None:
+            visible_mask = torch.ones(self._gaussians.get_anchor.shape[0], dtype=torch.bool, device = self._gaussians.get_anchor.device)
+        
+        feat = self._gaussians._anchor_feat[visible_mask]
+        anchor = self._gaussians.get_anchor[visible_mask]
+        grid_offsets = self._gaussians._offset[visible_mask]
+        grid_scaling = self._gaussians.get_scaling[visible_mask]
+
+        ob_view = viewpoint_camera.ortho_view.repeat(anchor.shape[0], 1)
+        ob_view = ob_view / ob_view.norm(dim=1, keepdim=True)
+
+        ob_dist = (anchor - viewpoint_camera.camera_center)[:, 2:3]
+
+        ## view-adaptive feature
+        if self._gaussians.use_feat_bank:
+            cat_view = torch.cat([ob_view, ob_dist], dim=1)
+            
+            bank_weight = self._gaussians.get_featurebank_mlp(cat_view).unsqueeze(dim=1) # [n, 1, 3]
+
+            ## multi-resolution feat
+            feat = feat.unsqueeze(dim=-1)
+            feat = feat[:,::4, :1].repeat([1,4,1])*bank_weight[:,:,:1] + \
+                feat[:,::2, :1].repeat([1,2,1])*bank_weight[:,:,1:2] + \
+                feat[:,::1, :1]*bank_weight[:,:,2:]
+            feat = feat.squeeze(dim=-1) # [n, c]
+
+
+        cat_local_view = torch.cat([feat, ob_view, ob_dist], dim=1) # [N, c+3+1]
+        cat_local_view_wodist = torch.cat([feat, ob_view], dim=1) # [N, c+3]
+        if self._gaussians.appearance_dim > 0:
+            camera_indicies = torch.ones_like(cat_local_view[:,0], dtype=torch.long, device=ob_dist.device) * viewpoint_camera.uid
+            # camera_indicies = torch.ones_like(cat_local_view[:,0], dtype=torch.long, device=ob_dist.device) * 10
+            appearance = self._gaussians.get_appearance(camera_indicies)
+
+        # get offset's opacity
+        if self._gaussians.add_opacity_dist:
+            neural_opacity = self._gaussians.get_opacity_mlp(cat_local_view) # [N, k]
+        else:
+            neural_opacity = self._gaussians.get_opacity_mlp(cat_local_view_wodist)
+
+        # opacity mask generation
+        neural_opacity = neural_opacity.reshape([-1, 1])
+        mask = (neural_opacity>0.0)
+        mask = mask.view(-1)
+
+        # select opacity 
+        opacity = neural_opacity[mask]
+
+        # get offset's color
+        if self._gaussians.appearance_dim > 0:
+            if self._gaussians.add_color_dist:
+                color = self._gaussians.get_color_mlp(torch.cat([cat_local_view, appearance], dim=1))
+            else:
+                color = self._gaussians.get_color_mlp(torch.cat([cat_local_view_wodist, appearance], dim=1))
+        else:
+            if self._gaussians.add_color_dist:
+                color = self._gaussians.get_color_mlp(cat_local_view)
+            else:
+                color = self._gaussians.get_color_mlp(cat_local_view_wodist)
+        color = color.reshape([anchor.shape[0]*self._gaussians.n_offsets, 3])# [mask]
+
+        # get offset's cov
+        if self._gaussians.add_cov_dist:
+            scale_rot = self._gaussians.get_cov_mlp(cat_local_view)
+        else:
+            scale_rot = self._gaussians.get_cov_mlp(cat_local_view_wodist)
+        scale_rot = scale_rot.reshape([anchor.shape[0]*self._gaussians.n_offsets, 7]) # [mask]
+        
+        # offsets
+        offsets = grid_offsets.view([-1, 3]) # [mask]
+        
+        # combine for parallel masking
+        concatenated = torch.cat([grid_scaling, anchor], dim=-1)
+        concatenated_repeated = repeat(concatenated, 'n (c) -> (n k) (c)', k=self._gaussians.n_offsets)
+        concatenated_all = torch.cat([concatenated_repeated, color, scale_rot, offsets], dim=-1)
+        masked = concatenated_all[mask]
+        scaling_repeat, repeat_anchor, color, scale_rot, offsets = masked.split([6, 3, 3, 7, 3], dim=-1)
+        
+        # post-process cov
+        scaling = scaling_repeat[:,3:] * torch.sigmoid(scale_rot[:,:3]) # * (1+torch.sigmoid(repeat_dist))
+        rot = self._gaussians.rotation_activation(scale_rot[:,3:7])
+        
+        # post-process offsets to get centers for gaussians
+        offsets = offsets * scaling_repeat[:,:3]
+        xyz = repeat_anchor + offsets
+
+        if is_training:
+            return xyz, color, opacity, scaling, rot, neural_opacity, mask
+        else:
+            return xyz, color, opacity, scaling, rot
+
+    @torch.no_grad()
+    def generate_ortho_gaussians(self, viewpoint_camera):
+        # prefilter
+        voxel_visible_mask = self.prefilter_voxel(viewpoint_camera)
+        xyz, color, opacity, scaling, rot = self.generate_ortho_neural_gaussians(viewpoint_camera, voxel_visible_mask)
+        other_output = {
+            "scaling": scaling,
+            "voxel_visible_mask": voxel_visible_mask
+        }    
+        cov3D_precomp = None
+        shs = None
+        return xyz, opacity, scaling, rot, cov3D_precomp, shs, color, other_output
+    

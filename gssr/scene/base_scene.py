@@ -92,8 +92,14 @@ class Scene(nn.Module):
     def generate_gaussians(self, viewpoint_camera):
         """"""
     
-    def render(self, viewpoint_camera) -> Dict[str, torch.Tensor]:
+    def generate_ortho_gaussians(self, viewpoint_camera):
+        """"""
+    
+    def render(self, viewpoint_camera, means3D, opacity, scales, rotations, cov3D_precomp, shs, colors_precomp) -> Dict[str, torch.Tensor]:
         """Rendering"""
+    
+    def render_ortho(self, viewpoint_camera, means3D, opacity, scales, rotations, cov3D_precomp, shs, colors_precomp) -> Dict[str, torch.Tensor]:
+        """Rendering Orthophoto"""
     
     def get_metrics_dict(self, outputs, viewpoint_cam) -> Dict[str, torch.Tensor]:
         """Compute and returns metrics."""

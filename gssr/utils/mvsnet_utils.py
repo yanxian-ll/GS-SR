@@ -348,7 +348,7 @@ def write_pairs(file, view_sel):
         for i, sorted_score in enumerate(view_sel):
             f.write('%d\n%d ' % (i, len(sorted_score)))
             for image_id, s in sorted_score:
-                f.write('%d %d ' % (image_id, s))
+                f.write('%d %f ' % (image_id, s))
             f.write('\n')
 
 def read_pairs(file):

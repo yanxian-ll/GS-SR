@@ -19,20 +19,24 @@ class TwoDGSSceneConfig(VanillaSceneConfig):
     depth_ratio: float = 0.0
     """depth_ratio = 0 or 1"""
 
+    start_normal_loss_iter: int = 7000
+    satrt_dist_loss_iter: int = 3000
+
 class TwoDGSScene(VanillaScene):
     config: TwoDGSSceneConfig
 
     def get_loss_dict(self, outputs, viewpoint_cam, step, metrics_dict=None, **kwargs) -> Dict[str, Tensor]:
         loss_dict = super().get_loss_dict(outputs, viewpoint_cam, step, metrics_dict, **kwargs)
         # regularization
-        lambda_normal = self.config.lambda_normal if step > 7000 else 0.0
-        lambda_dist = self.config.lambda_dist if step > 3000 else 0.0
+        lambda_normal = self.config.lambda_normal if step > self.config.start_normal_loss_iter else 0.0
+        lambda_dist = self.config.lambda_dist if step > self.config.satrt_dist_loss_iter else 0.0
 
         rend_dist, rend_normal, surf_normal = outputs["rend_dist"], outputs['normal'], outputs['surf_normal']
         normal_error = (1 - (rend_normal * surf_normal).sum(dim=0))[None]
         loss_dict["normal_loss"] = lambda_normal * (normal_error).mean()
         loss_dict["dist_loss"] = lambda_dist * (rend_dist).mean()
         return loss_dict
+        
     
     def render(self, viewpoint_camera, means3D, opacity, scales, rotations, cov3D_precomp, shs, colors_precomp):
         # Create zero tensor. We will use it to make pytorch return gradients of the 2D (screen-space) means
@@ -125,3 +129,9 @@ class TwoDGSScene(VanillaScene):
         })
 
         return rets
+    
+
+    @torch.no_grad()
+    def render_ortho(self, viewpoint_camera, means3D, opacity, scales, rotations, cov3D_precomp, shs, colors_precomp):
+       """Not Impletement
+       """

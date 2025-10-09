@@ -41,6 +41,7 @@ def train_loop(local_rank: int, world_size: int, config: cfg.Config, global_rank
     torch.cuda.set_device(local_rank)
     trainer = Trainer(config, local_rank, world_size)
     trainer.setup()
+    config.save_config()
     trainer.train()
 
 
@@ -83,6 +84,12 @@ def launch(
 def main(config: cfg.Config) -> None:
     """Main function."""
 
+    # to ensure 
+    random.seed(0)
+    np.random.seed(0)
+    torch.manual_seed(0)
+    torch.cuda.set_device(torch.device("cuda:0"))
+
     config.set_timestamp()
 
     if config.trainer.load_config:
@@ -117,6 +124,15 @@ def entrypoint():
         )
     )
 
+    # from gssr.configs.method_config import method_configs
+    # # main(method_configs['scaffold-gs'])
+    # # main(method_configs['satellite-3dgs'])
+    # # main(method_configs['satellite-2dgs'])
+    # # main(method_configs['satellite-pgsr'])
+    # main(method_configs['satellite-scaffold-gs'])
+    # # main(method_configs['satellite-scaffold-2dgs'])
+    # # main(method_configs['satellite-octree-2dgs'])
+    # # main(method_configs['satellite-scaffold-pgsr'])
 
 
 if __name__ == "__main__":

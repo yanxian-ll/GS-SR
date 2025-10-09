@@ -13,13 +13,14 @@ from gssr.engine.callbacks import TrainingCallback
 @dataclass
 class DataLoaderConfig(cfg.InstantiateConfig):
     _target: Type = field(default_factory=lambda: DataLoader)
-    shuffle: bool = True
+    shuffle: bool = False
     llffhold: int = 8
     resolution_scales: List[float] = field(default_factory=lambda: [1.0])
     images: str = 'images'
     device: str = 'cuda'
     resolution: int = -1
     white_background: bool = False
+
 
 class DataLoader(nn.Module):
     config: DataLoaderConfig

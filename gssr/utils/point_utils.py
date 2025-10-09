@@ -55,8 +55,8 @@ def get_points_depth_in_depth_map(fov_camera, depth, points_in_camera_space, sca
     W, H = int(fov_camera.image_width / scale), int(fov_camera.image_height / scale)
     depth_view = depth_view[:H, :W]
     pts_projections = torch.stack(
-                    [points_in_camera_space[:,0] * fov_camera.Fx / points_in_camera_space[:,2] + fov_camera.Cx,
-                    points_in_camera_space[:,1] * fov_camera.Fy / points_in_camera_space[:,2] + fov_camera.Cy], -1).float()/scale
+                    [points_in_camera_space[:,0] * fov_camera.Fx / (points_in_camera_space[:,2] + 1e-10) + fov_camera.Cx,
+                    points_in_camera_space[:,1] * fov_camera.Fy / (points_in_camera_space[:,2] + 1e-10) + fov_camera.Cy], -1).float() / scale
     mask = (pts_projections[:, 0] > 0) & (pts_projections[:, 0] < W) &\
            (pts_projections[:, 1] > 0) & (pts_projections[:, 1] < H) & (points_in_camera_space[:,2] > 0.1)
 

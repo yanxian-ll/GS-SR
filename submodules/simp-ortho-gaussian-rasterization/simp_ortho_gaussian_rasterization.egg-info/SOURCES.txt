@@ -1,0 +1,12 @@
+LICENSE.md
+README.md
+ext.cpp
+rasterize_points.cu
+setup.py
+cuda_rasterizer/forward.cu
+cuda_rasterizer/rasterizer_impl.cu
+simp_ortho_gaussian_rasterization/__init__.py
+simp_ortho_gaussian_rasterization.egg-info/PKG-INFO
+simp_ortho_gaussian_rasterization.egg-info/SOURCES.txt
+simp_ortho_gaussian_rasterization.egg-info/dependency_links.txt
+simp_ortho_gaussian_rasterization.egg-info/top_level.txt

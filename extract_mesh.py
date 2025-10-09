@@ -51,7 +51,7 @@ def eval_setup(config_path: Path, data_device: str = "cuda") -> Tuple[cfg.Config
 
     # setup scene (which includes the dataloader and gaussians)
     config.scene.dataloader.device = data_device
-    scene = config.scene.setup(source_dir = config.source_path, eval = False, device = device)
+    scene = config.scene.setup(source_dir = config.source_path, eval = config.eval, device = device)
     assert isinstance(scene, Scene)
 
     # load gaussians information
@@ -65,24 +65,25 @@ class MeshExtractor:
     """Load a gaussian-model, extract mesh"""
 
     # Path to config YAML file.
-    load_config: Path
-    skip_train: bool = False
-    skip_test: bool = False
-    skip_mesh: bool = False
-    render_video: bool = False
+    load_config: Path = Path("output/JAX_214_crop/satellite-3dgs/2024-11-29_205526/config.yml")
+    skip_train: bool = True
+    skip_test: bool = True
+    skip_mesh: bool = True
+    skip_video: bool = True
     frames: int = 240
+    
     unbounded: bool = False
     depth_trunc: float = -1
     voxel_size: float = -1
     sdf_trunc: float = -1
-    num_cluster: int = 1
+    num_cluster: int = 50
     mesh_res: int = 1024
 
     data_device: str = "cuda"
 
-    def main(self) -> None:
+    def main(self, load_config=None):
         """Main function."""
-        config, scene, _ = eval_setup(config_path=self.load_config)
+        config, scene, _ = eval_setup(config_path=load_config if load_config else self.load_config)
         train_cams = scene.dataloader.getTrainData()
         test_cams = scene.dataloader.getTestData()
 
@@ -104,7 +105,7 @@ class MeshExtractor:
             gaussExtractor.reconstruction(test_cams)
             gaussExtractor.export_image(test_dir)
     
-        if self.render_video:
+        if not self.skip_video:
             CONSOLE.log("render videos ...")
             os.makedirs(traj_dir, exist_ok=True)
             cam_traj = generate_path(train_cams, n_frames=self.frames)
@@ -133,6 +134,9 @@ class MeshExtractor:
             mesh_post = post_process_mesh(mesh, cluster_to_keep=self.num_cluster)
             o3d.io.write_triangle_mesh(os.path.join(train_dir, name.replace('.ply', '_post.ply')), mesh_post)
             CONSOLE.log("mesh post processed saved at {}".format(os.path.join(train_dir, name.replace('.ply', '_post.ply'))))
+            return config, mesh_post
+        else:
+            return config
     
 def entrypoint():
     """Entrypoint for use with pyproject scripts."""

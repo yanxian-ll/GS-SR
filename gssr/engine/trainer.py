@@ -28,7 +28,7 @@ from gssr.configs import base_config as cfg
 from gssr.engine.callbacks import TrainingCallback, TrainingCallbackLocation
 from gssr.scene.base_scene import Scene
 from gssr.utils.tensorboard_utils import *
-from gssr.utils.image_utils import psnr
+from gssr.utils.image_utils import psnr, ssim
 
 CONSOLE = Console(width=120)
 
@@ -80,6 +80,7 @@ class Trainer:
 
         iter_start = torch.cuda.Event(enable_timing = True)
         iter_end = torch.cuda.Event(enable_timing = True)
+        torch.autograd.set_detect_anomaly(True)
 
         num_iterations = self.config.trainer.iterations
         self._start_step += 1
@@ -107,16 +108,17 @@ class Trainer:
                     progress_bar.close()
 
                 # TODO: Log and save
-                if (step in self.config.trainer.test_iterations):
+                if (step in self.config.trainer.test_iterations) or (step==self.config.trainer.iterations):
                     self.evaluation(step)
 
-                if (step in self.config.trainer.save_iterations):
+                if (step in self.config.trainer.save_iterations) or (step==self.config.trainer.iterations):
                     self.save_gaussians(step)
                 write_scalar(self.tb_writer, "loss", loss, step)
                 write_scalar_dict(self.tb_writer, "loss", loss_dict, step)
 
                 # densify
-                self.scene.densify(step, model_output)
+                if self.config.trainer.densify:
+                    self.scene.densify(step, model_output)
                 
                 # # training callbacks after the training iteration
                 # for callback in self.callbacks:
@@ -141,15 +143,17 @@ class Trainer:
             if config['cameras'] and len(config['cameras']) > 0:
                 l1_test = 0.0
                 psnr_test = 0.0
+                ssim_test = 0.0
                 for idx, viewpoint in enumerate(config['cameras']):
                     image = torch.clamp(self.scene.eval_render(viewpoint)['render'], 0.0 ,1.0)
                     gt_image = torch.clamp(viewpoint.original_image.to(self.device), 0.0 , 1.0)
                     l1_test += self.scene.l1_loss(image, gt_image).mean().double()
                     psnr_test += psnr(image, gt_image).mean().double()
+                    ssim_test += ssim(image, gt_image).mean().double()
                 psnr_test /= len(config['cameras'])
                 l1_test /= len(config['cameras'])
-                CONSOLE.log(f"\n[ITER {step}] Evaluating {config['name']}: L1 {l1_test} PSNR {psnr_test}.")
-
+                ssim_test /= len(config['cameras'])
+                CONSOLE.log(f"\n[ITER {step}] Evaluating {config['name']}: L1 {l1_test} PSNR {psnr_test}, SSIM {ssim_test}.")
 
     
     def save_checkpoint(self, step: int) -> None:

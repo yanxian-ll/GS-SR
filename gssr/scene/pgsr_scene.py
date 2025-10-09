@@ -15,6 +15,12 @@ from gssr.utils.graphics_utils import patch_offsets, patch_warp, normal_from_dep
 from diff_plane_rasterization import GaussianRasterizationSettings as PlaneGaussianRasterizationSettings
 from diff_plane_rasterization import GaussianRasterizer as PlaneGaussianRasterizer
 
+try:
+    from ortho_plane_rasterization import GaussianRasterizationSettings as OrthoPlaneGaussianRasterizationSettings
+    from ortho_plane_rasterization import GaussianRasterizer as OrthoPlaneGaussianRasterizer
+except:
+    pass
+
 @dataclass
 class PGSRSceneConfig(VanillaSceneConfig):
     _target: type = field(default_factory=lambda: PGSRScene)
@@ -22,8 +28,11 @@ class PGSRSceneConfig(VanillaSceneConfig):
     lambda_ncc: float = 0.15
     lambda_geo: float = 0.03
     patch_size: int = 3
-    nunm_sample: int = 102400
+    num_sample: int = 102400
     pixel_noise_threshold: float = 1.0
+
+    start_single_view_loss_iter: int = 3000
+    start_multi_view_loss_iter: int = 3000
 
 class PGSRScene(VanillaScene):
     config: PGSRSceneConfig
@@ -55,7 +64,6 @@ class PGSRScene(VanillaScene):
         out = 1 - self.dilate(1 - bin_img, ksize)
         return out
     
-
     # copied from PGSR
     def lncc(self, ref, nea):
         # ref_gray: [batch_size, total_patch_size]
@@ -105,14 +113,14 @@ class PGSRScene(VanillaScene):
         normal, depth_normal = outputs["rendered_normal"], outputs["depth_normal"]
         render_pkg = outputs
         # sigle-view loss
-        if step > 7000:
+        if step > self.config.start_single_view_loss_iter:
             image_weight = (1.0 - self._get_img_grad_weight(gt_image))
             image_weight = (image_weight).clamp(0,1).detach() ** 5
             image_weight = self.erode(image_weight[None, None]).squeeze()
             normal_loss = self.config.lambda_normal * (image_weight * (((depth_normal - normal)).abs().sum(0))).mean()
         
         # multi-view loss
-        if step > 7000:
+        if step > self.config.start_multi_view_loss_iter:
             patch_size = self.config.patch_size
             total_patch_size = (self.config.patch_size * 2 + 1) ** 2
             ## compute geometry consistency mask and loss
@@ -127,28 +135,57 @@ class PGSRScene(VanillaScene):
             pts_in_near_cam = pts @ near_cam.world_view_transform[:3,:3] + near_cam.world_view_transform[3,:3]
             map_z, d_mask = get_points_depth_in_depth_map(near_cam, nearest_render_pkg['plane_depth'], pts_in_near_cam)
                     
-            pts_in_near_cam = pts_in_near_cam / (pts_in_near_cam[:,2:3])
+            pts_in_near_cam = pts_in_near_cam / (pts_in_near_cam[:,2:3] + 1e-10)
             pts_in_near_cam = pts_in_near_cam * map_z.squeeze()[...,None]
             R = torch.tensor(near_cam.R).float().cuda()
             T = torch.tensor(near_cam.T).float().cuda()
             pts_ = (pts_in_near_cam - T) @ R.transpose(-1,-2)
             pts_in_view_cam = pts_ @ viewpoint_cam.world_view_transform[:3,:3] + viewpoint_cam.world_view_transform[3,:3]
             pts_projections = torch.stack(
-                    [pts_in_view_cam[:,0] * viewpoint_cam.Fx / pts_in_view_cam[:,2] + viewpoint_cam.Cx,
-                    pts_in_view_cam[:,1] * viewpoint_cam.Fy / pts_in_view_cam[:,2] + viewpoint_cam.Cy], -1).float()
+                    [pts_in_view_cam[:,0] * viewpoint_cam.Fx / (pts_in_view_cam[:,2] + 1e-10) + viewpoint_cam.Cx,
+                    pts_in_view_cam[:,1] * viewpoint_cam.Fy / (pts_in_view_cam[:,2] + 1e-10) + viewpoint_cam.Cy], -1).float()
+            
             pixel_noise = torch.norm(pts_projections - pixels.reshape(*pts_projections.shape), dim=-1)
+
             d_mask = d_mask & (pixel_noise < self.config.pixel_noise_threshold)
             weights = (1.0 / torch.exp(pixel_noise)).detach()
             weights[~d_mask] = 0
 
-            if d_mask.sum() > 0:
+            # with torch.no_grad():
+            #     if step % 200 == 0:
+            #         import cv2
+            #         import os
+
+            #         gt_img_show = ((gt_image).permute(1,2,0).clamp(0,1)[:,:,[2,1,0]]*255).detach().cpu().numpy().astype(np.uint8)
+            #         img_show = ((outputs['render']).permute(1,2,0).clamp(0,1)[:,:,[2,1,0]]*255).detach().cpu().numpy().astype(np.uint8)
+            #         normal_show = (((normal+1.0)*0.5).permute(1,2,0).clamp(0,1)*255).detach().cpu().numpy().astype(np.uint8)
+            #         depth_normal_show = (((depth_normal+1.0)*0.5).permute(1,2,0).clamp(0,1)*255).detach().cpu().numpy().astype(np.uint8)
+            #         d_mask_show = (weights.float()*255).detach().cpu().numpy().astype(np.uint8).reshape(H,W)
+            #         d_mask_show_color = cv2.applyColorMap(d_mask_show, cv2.COLORMAP_JET)
+            #         depth = outputs['plane_depth'].squeeze().detach().cpu().numpy()
+            #         depth_i = (depth - depth.min()) / (depth.max() - depth.min() + 1e-20)
+            #         depth_i = (depth_i * 255).clip(0, 255).astype(np.uint8)
+            #         depth_color = cv2.applyColorMap(depth_i, cv2.COLORMAP_JET)
+            #         distance = outputs['rendered_distance'].squeeze().detach().cpu().numpy()
+            #         distance_i = (distance - distance.min()) / (distance.max() - distance.min() + 1e-20)
+            #         distance_i = (distance_i * 255).clip(0, 255).astype(np.uint8)
+            #         distance_color = cv2.applyColorMap(distance_i, cv2.COLORMAP_JET)
+            #         image_weight = image_weight.detach().cpu().numpy()
+            #         image_weight = (image_weight * 255).clip(0, 255).astype(np.uint8)
+            #         image_weight_color = cv2.applyColorMap(image_weight, cv2.COLORMAP_JET)
+            #         row0 = np.concatenate([gt_img_show, img_show, normal_show, distance_color], axis=1)
+            #         row1 = np.concatenate([d_mask_show_color, depth_color, depth_normal_show, image_weight_color], axis=1)
+            #         image_to_show = np.concatenate([row0, row1], axis=0)
+            #         cv2.imwrite(os.path.join("./test_output", "%05d"%step + "_" + viewpoint_cam.image_name + ".jpg"), image_to_show)
+
+            if d_mask.sum() > 100:
                 geo_loss = self.config.lambda_geo * ((weights * pixel_noise)[d_mask]).mean()
                 with torch.no_grad():
                     ## sample mask
                     d_mask = d_mask.reshape(-1)
                     valid_indices = torch.arange(d_mask.shape[0], device=d_mask.device)[d_mask]
-                    if d_mask.sum() > self.config.nunm_sample:
-                        index = np.random.choice(d_mask.sum().cpu().numpy(), self.config.nunm_sample, replace = False)
+                    if d_mask.sum() > self.config.num_sample:
+                        index = np.random.choice(d_mask.sum().cpu().numpy(), self.config.num_sample, replace = False)
                         valid_indices = valid_indices[index]
 
                     weights = weights.reshape(-1)[valid_indices]  #(N,)
@@ -202,7 +239,6 @@ class PGSRScene(VanillaScene):
         loss_dict["geo_loss"] = geo_loss
         return loss_dict
 
-    
     def get_train_loss_dict(self, step: int):
         viewpoint_cam = self.dataloader.next_train()
 
@@ -214,7 +250,7 @@ class PGSRScene(VanillaScene):
         ## render near camera
         near_model_outputs = None
         near_cam = None
-        if step > 7000:
+        if step > self.config.start_multi_view_loss_iter:
             near_cam = None if len(viewpoint_cam.near_ids) == 0 else self.dataloader.getTrainData()[random.sample(viewpoint_cam.near_ids, 1)[0]]
             means3D, opacity, scales, rotations, cov3D_precomp, shs, colors_precomp, other_output = self.generate_gaussians(near_cam)
             near_model_outputs = self.render(near_cam, means3D, opacity, scales, rotations, cov3D_precomp, shs, colors_precomp)
@@ -223,7 +259,6 @@ class PGSRScene(VanillaScene):
         loss_dict = self.get_loss_dict(model_outputs, viewpoint_cam, step, metrics_dict, near_cam=near_cam, nearest_render_pkg=near_model_outputs)
         return model_outputs, loss_dict, metrics_dict
     
-
     def render_normal(self, viewpoint_cam, depth, offset=None, normal=None, scale=1):
         # depth: (H, W), bg_color: (3), alpha: (H, W)
         # normal_ref: (3, H, W)
@@ -237,7 +272,6 @@ class PGSRScene(VanillaScene):
         normal_ref = normal_ref.permute(2,0,1)
         return normal_ref
     
-
     def get_rotation_matrix(self, rotation):
         return quaternion_to_matrix(rotation)
 
@@ -256,7 +290,6 @@ class PGSRScene(VanillaScene):
         normal_global[neg_mask] = -normal_global[neg_mask]
         return normal_global
     
-
     def render(self, viewpoint_camera, means3D, opacity, scales, rotations, cov3D_precomp, shs, colors_precomp):
          # Create zero tensor. We will use it to make pytorch return gradients of the 2D (screen-space) means
         screenspace_points = torch.zeros_like(means3D, dtype=means3D.dtype, requires_grad=True, device="cuda") + 0
@@ -291,6 +324,91 @@ class PGSRScene(VanillaScene):
             )
 
         rasterizer = PlaneGaussianRasterizer(raster_settings=raster_settings)
+
+        global_normal = self.get_normal(viewpoint_camera, means3D, rotations, scales)
+        local_normal = global_normal @ viewpoint_camera.world_view_transform[:3,:3]
+        pts_in_cam = means3D @ viewpoint_camera.world_view_transform[:3,:3] + viewpoint_camera.world_view_transform[3,:3]
+        local_distance = (local_normal * pts_in_cam).sum(-1).abs()
+        input_all_map = torch.zeros((means3D.shape[0], 5)).cuda().float()
+        input_all_map[:, :3] = local_normal
+        input_all_map[:, 3] = 1.0
+        input_all_map[:, 4] = local_distance
+
+        rendered_image, radii, out_observe, out_all_map, plane_depth = rasterizer(
+            means3D = means3D,
+            means2D = means2D,
+            means2D_abs = means2D_abs,
+            shs = shs,
+            colors_precomp = colors_precomp,
+            opacities = opacity,
+            scales = scales,
+            rotations = rotations,
+            all_map = input_all_map,
+            cov3D_precomp = cov3D_precomp)
+
+        rendered_normal = out_all_map[0:3]
+        rendered_alpha = out_all_map[3:4, ]
+        rendered_distance = out_all_map[4:5, ]
+
+        depth_normal = self.render_normal(viewpoint_camera, plane_depth.squeeze()) * (rendered_alpha).detach()
+        
+        return_dict =  {"render": rendered_image,
+                        "viewspace_points": screenspace_points,
+                        "viewspace_points_abs": screenspace_points_abs,
+                        "visibility_filter" : radii > 0,
+                        "radii": radii,
+                        "out_observe": out_observe,
+                        "rendered_normal": rendered_normal,
+                        "plane_depth": plane_depth,
+                        "rendered_distance": rendered_distance,
+                        "depth_normal": depth_normal,
+
+                        "normal": rendered_normal,
+                        "depth": plane_depth,
+                        }
+        # Those Gaussians that were frustum culled or had a radius of 0 were not visible.
+        # They will be excluded from value updates used in the splitting criteria.
+        return return_dict
+
+    @torch.no_grad()
+    def render_ortho(self, viewpoint_camera, means3D, opacity, scales, rotations, cov3D_precomp, shs, colors_precomp):
+         # Create zero tensor. We will use it to make pytorch return gradients of the 2D (screen-space) means
+        screenspace_points = torch.zeros_like(means3D, dtype=means3D.dtype, requires_grad=True, device="cuda") + 0
+        screenspace_points_abs = torch.zeros_like(means3D, dtype=means3D.dtype, requires_grad=True, device="cuda") + 0
+        try:
+            screenspace_points.retain_grad()
+            screenspace_points_abs.retain_grad()
+        except:
+            pass
+
+        # Set up rasterization configuration
+        tanfovx = math.tan(viewpoint_camera.FoVx * 0.5)
+        tanfovy = math.tan(viewpoint_camera.FoVy * 0.5)
+
+        means2D = screenspace_points
+        means2D_abs = screenspace_points_abs
+
+        raster_settings = OrthoPlaneGaussianRasterizationSettings(
+                image_height=int(viewpoint_camera.image_height),
+                image_width=int(viewpoint_camera.image_width),
+                tanfovx=tanfovx,
+                tanfovy=tanfovy,
+
+                dx=viewpoint_camera.ground_width,
+                dy=viewpoint_camera.ground_height,
+
+                bg=self.background,
+                scale_modifier=self.config.scaling_modifier,
+                viewmatrix=viewpoint_camera.world_view_transform,
+                projmatrix=viewpoint_camera.full_proj_transform,
+                sh_degree=self._gaussians.active_sh_degree,
+                campos=viewpoint_camera.camera_center,
+                prefiltered=False,
+                render_geo=True,
+                debug=self.config.debug
+            )
+
+        rasterizer = OrthoPlaneGaussianRasterizer(raster_settings=raster_settings)
 
         global_normal = self.get_normal(viewpoint_camera, means3D, rotations, scales)
         local_normal = global_normal @ viewpoint_camera.world_view_transform[:3,:3]

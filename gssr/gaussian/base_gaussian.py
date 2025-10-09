@@ -19,8 +19,9 @@ class GaussianModelConfig(cfg.InstantiateConfig):
     _target: type = field(default_factory=lambda: GaussianModel)
     max_sh_degree: int = 3
     percent_dense: float = 0.01
-    sampling_ratio: int = 1
+    sampling_interval: int = 1
     """sampling the input point cloud"""
+    active_sh_degree: int = 0
 
 class GaussianModel:
     config: GaussianModelConfig
@@ -42,7 +43,7 @@ class GaussianModel:
         self.white_background = False
 
         self.max_sh_degree = self.config.max_sh_degree
-        self.active_sh_degree = 0
+        self.active_sh_degree = self.config.active_sh_degree
         self.percent_dense = self.config.percent_dense
 
     
