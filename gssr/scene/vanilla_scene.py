@@ -12,13 +12,6 @@ from gssr.utils.image_utils import ssim
 
 from diff_gaussian_rasterization import GaussianRasterizationSettings, GaussianRasterizer
 
-try:
-    from ortho_gaussian_rasterization import GaussianRasterizationSettings as OrthoGaussianRasterizationSettings
-    from ortho_gaussian_rasterization import GaussianRasterizer as OrthoGaussianRasterizer
-except:
-    pass
-
-
 @dataclass
 class VanillaSceneConfig(SceneConfig):
     _target: type = field(default_factory=lambda: VanillaScene)
@@ -84,7 +77,6 @@ class VanillaScene(Scene):
         other_output = {}  # used for scaffold
         return means3D, opacity, scales, rotations, cov3D_precomp, shs, colors_precomp, other_output
 
-
     def render(self, viewpoint_camera, means3D, opacity, scales, rotations, cov3D_precomp, shs, colors_precomp):
         # Create zero tensor. We will use it to make pytorch return gradients of the 2D (screen-space) means
         screenspace_points = torch.zeros_like(means3D, dtype=means3D.dtype, requires_grad=True, device=self.device) + 0
@@ -136,6 +128,52 @@ class VanillaScene(Scene):
                 "radii": radii,
                 "depth": 1.0 / (depth_image)}
     
+    @torch.no_grad()
+    def render_ortho(self, viewpoint_camera, means3D, opacity, scales, rotations, cov3D_precomp, shs, colors_precomp):
+        screenspace_points = torch.zeros_like(means3D, dtype=means3D.dtype, requires_grad=True, device=self.device) + 0
+
+        tanfovx = math.tan(viewpoint_camera.FoVx * 0.5)
+        tanfovy = math.tan(viewpoint_camera.FoVy * 0.5)
+
+        raster_settings = GaussianRasterizationSettings(
+            image_height=int(viewpoint_camera.image_height),
+            image_width=int(viewpoint_camera.image_width),
+            tanfovx=tanfovx,
+            tanfovy=tanfovy,
+            bg=self.background,
+            scale_modifier=self.config.scaling_modifier,
+            viewmatrix=viewpoint_camera.world_view_transform,
+            projmatrix=viewpoint_camera.full_proj_transform,
+            sh_degree=self._gaussians.active_sh_degree,
+            campos=viewpoint_camera.camera_center,
+            prefiltered=False,
+            debug=self.config.debug,
+            antialiasing=self.config.antialiasing,
+            ortho_rendering=True,
+            dx=viewpoint_camera.ground_width,
+            dy=viewpoint_camera.ground_height,
+        )
+        rasterizer = GaussianRasterizer(raster_settings=raster_settings)
+
+        means2D = screenspace_points
+        # Rasterize visible Gaussians to image, obtain their radii (on screen). 
+        rendered_image, radii, depth_image = rasterizer(
+            means3D = means3D,
+            means2D = means2D,
+            shs = shs,
+            colors_precomp = colors_precomp,
+            opacities = opacity,
+            scales = scales,
+            rotations = rotations,
+            cov3D_precomp = cov3D_precomp)
+
+        # Those Gaussians that were frustum culled or had a radius of 0 were not visible.
+        # They will be excluded from value updates used in the splitting criteria.
+        return {"render": rendered_image,
+                "viewspace_points": screenspace_points,
+                "visibility_filter" : radii > 0,
+                "radii": radii,
+                "depth": 1.0 / depth_image}
 
     @torch.no_grad()
     def simp_render(self, viewpoint_camera, means3D, opacity, scales, rotations, cov3D_precomp, shs, colors_precomp):
@@ -195,7 +233,6 @@ class VanillaScene(Scene):
                 "counts": counts,
                 "depth": 1.0 / (depth_image)}
     
-
     @torch.no_grad()
     def simp_render_ortho(self, viewpoint_camera, means3D, opacity, scales, rotations, cov3D_precomp, shs, colors_precomp):
 
@@ -259,53 +296,3 @@ class VanillaScene(Scene):
                 "depth": 1.0 / (depth_image)}
     
 
-    @torch.no_grad()
-    def render_ortho(self, viewpoint_camera, means3D, opacity, scales, rotations, cov3D_precomp, shs, colors_precomp):
-        screenspace_points = torch.zeros_like(means3D, dtype=means3D.dtype, requires_grad=True, device=self.device) + 0
-
-        tanfovx = math.tan(viewpoint_camera.FoVx * 0.5)
-        tanfovy = math.tan(viewpoint_camera.FoVy * 0.5)
-
-        raster_settings = OrthoGaussianRasterizationSettings(
-            image_height=int(viewpoint_camera.image_height),
-            image_width=int(viewpoint_camera.image_width),
-            tanfovx=tanfovx,
-            tanfovy=tanfovy,
-            
-            dx=viewpoint_camera.ground_width,
-            dy=viewpoint_camera.ground_height,
-
-            bg=self.background,
-            scale_modifier=self.config.scaling_modifier,
-            viewmatrix=viewpoint_camera.world_view_transform,
-            projmatrix=viewpoint_camera.full_proj_transform,
-            sh_degree=self._gaussians.active_sh_degree,
-            campos=viewpoint_camera.camera_center,
-            prefiltered=False,
-            debug=self.config.debug,
-            antialiasing=self.config.antialiasing
-        )
-
-        rasterizer = OrthoGaussianRasterizer(raster_settings=raster_settings)
-
-        means2D = screenspace_points
-
-        # Rasterize visible Gaussians to image, obtain their radii (on screen). 
-        rendered_image, radii, depth_image = rasterizer(
-            means3D = means3D,
-            means2D = means2D,
-            shs = shs,
-            colors_precomp = colors_precomp,
-            opacities = opacity,
-            scales = scales,
-            rotations = rotations,
-            cov3D_precomp = cov3D_precomp)
-
-        # Those Gaussians that were frustum culled or had a radius of 0 were not visible.
-        # They will be excluded from value updates used in the splitting criteria.
-        return {"render": rendered_image,
-                "viewspace_points": screenspace_points,
-                "visibility_filter" : radii > 0,
-                "radii": radii,
-                "depth": 1.0 / depth_image}
-    

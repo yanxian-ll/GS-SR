@@ -15,12 +15,6 @@ from gssr.utils.graphics_utils import patch_offsets, patch_warp, normal_from_dep
 from diff_plane_rasterization import GaussianRasterizationSettings as PlaneGaussianRasterizationSettings
 from diff_plane_rasterization import GaussianRasterizer as PlaneGaussianRasterizer
 
-try:
-    from ortho_plane_rasterization import GaussianRasterizationSettings as OrthoPlaneGaussianRasterizationSettings
-    from ortho_plane_rasterization import GaussianRasterizer as OrthoPlaneGaussianRasterizer
-except:
-    pass
-
 @dataclass
 class PGSRSceneConfig(VanillaSceneConfig):
     _target: type = field(default_factory=lambda: PGSRScene)
@@ -388,15 +382,11 @@ class PGSRScene(VanillaScene):
         means2D = screenspace_points
         means2D_abs = screenspace_points_abs
 
-        raster_settings = OrthoPlaneGaussianRasterizationSettings(
+        raster_settings = PlaneGaussianRasterizationSettings(
                 image_height=int(viewpoint_camera.image_height),
                 image_width=int(viewpoint_camera.image_width),
                 tanfovx=tanfovx,
                 tanfovy=tanfovy,
-
-                dx=viewpoint_camera.ground_width,
-                dy=viewpoint_camera.ground_height,
-
                 bg=self.background,
                 scale_modifier=self.config.scaling_modifier,
                 viewmatrix=viewpoint_camera.world_view_transform,
@@ -405,10 +395,13 @@ class PGSRScene(VanillaScene):
                 campos=viewpoint_camera.camera_center,
                 prefiltered=False,
                 render_geo=True,
-                debug=self.config.debug
+                debug=self.config.debug,
+                ortho_rendering=True,
+                dx=viewpoint_camera.ground_width,
+                dy=viewpoint_camera.ground_height,
             )
 
-        rasterizer = OrthoPlaneGaussianRasterizer(raster_settings=raster_settings)
+        rasterizer = PlaneGaussianRasterizer(raster_settings=raster_settings)
 
         global_normal = self.get_normal(viewpoint_camera, means3D, rotations, scales)
         local_normal = global_normal @ viewpoint_camera.world_view_transform[:3,:3]

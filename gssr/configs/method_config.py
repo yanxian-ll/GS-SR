@@ -87,6 +87,14 @@ method_configs["2dgs"] = Config(
     )
 )
 
+method_configs["pgsr"] = Config(
+    method_name="pgsr",
+    scene=PGSRSceneConfig(
+        dataloader=PGSRDataLoaderConfig(),
+        gaussians=PGSRGaussianConfig(),
+    )
+)
+
 method_configs["scaffold-gs"] = Config(
     method_name="scaffold-gs",
     scene=ScaffoldSceneConfig(
@@ -120,14 +128,6 @@ method_configs["octree-2dgs"] = Config(
     )
 )
 
-method_configs["pgsr"] = Config(
-    method_name="pgsr",
-    scene=PGSRSceneConfig(
-        dataloader=PGSRDataLoaderConfig(),
-        gaussians=PGSRGaussianConfig(),
-    )
-)
-
 method_configs["scaffold-pgsr"] = Config(
     method_name="scaffold-pgsr",
     scene=ScaffoldPGSRSceneConfig(
@@ -145,9 +145,7 @@ method_configs["octree-pgsr"] = Config(
 )
 
 
-
-
-
+# /////////////////////////////////////////////
 method_configs["satellite-3dgs"] = Config(
     method_name="satellite-3dgs",
     scene=VanillaSceneConfig(
@@ -177,7 +175,6 @@ method_configs["satellite-pgsr"] = Config(
 
 ### Our method
 from gssr.gaussian.satellite_scaffold_gaussian import SatelliteScaffoldGaussianConfig
-
 from gssr.scene.satellite_scaffold_scene import SatelliteScaffoldSceneConfig
 from gssr.scene.satellite_scaffold_2dgs_scene import SatelliteScaffold2DGSSceneConfig
 
@@ -209,22 +206,6 @@ method_configs["satellite-scaffold-2dgs"] = Config(
         lambda_scaling = 0.01,
     ),
 )
-####
-
-
-# method_configs["satellite-scaffold-2dgs"] = Config(
-#     method_name="satellite-scaffold-2dgs",
-#     scene=Scaffold2DGSSceneConfig(
-#         dataloader=SatelliteDataLoaderConfig(),
-#         gaussians=ScaffoldGaussianConfig(
-            
-#             add_opacity_dist = False,
-#             add_cov_dist = False,
-#             add_color_dist = False,
-#         ),
-#         lambda_scaling = 0.01,
-#     ),
-# )
 
 method_configs["satellite-scaffold-pgsr"] = Config(
     method_name="satellite-scaffold-pgsr",

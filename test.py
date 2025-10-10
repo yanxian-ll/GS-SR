@@ -89,8 +89,7 @@ class OrthoRender:
     """Load a gaussian-model, extract mesh"""
 
     # Path to config YAML file.
-    # load_config: Path = None
-    load_config: Path = Path("output/JAX_214/satellite-scaffold-gs/2024-12-19_165830/config.yml")
+    load_config: Path = None
 
     # data device
     data_device: str = "cuda"
@@ -199,7 +198,6 @@ class OrthoRender:
             elements[:] = list(map(tuple, attributes))
             el = PlyElement.describe(elements, 'vertex')
             PlyData([el]).write(os.path.join("./test_output", '{0:05d}'.format(idx) + ".ply"))
-
 
 
 def entrypoint():

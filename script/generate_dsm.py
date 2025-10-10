@@ -43,7 +43,6 @@ def eval_load_gaussians(config: cfg.TrainerConfig, scene: Scene) -> Path:
     CONSOLE.print(f":white_check_mark: Done loading gaussians from {load_path}")
     return load_path
 
-
 def eval_setup(config_path: Path, data_device: str = "cuda") -> Tuple[cfg.Config, Scene, Path]:
     # load save config
     config = yaml.load(config_path.read_text(), Loader=yaml.Loader)
@@ -59,7 +58,6 @@ def eval_setup(config_path: Path, data_device: str = "cuda") -> Tuple[cfg.Config
 
     # load gaussians information
     gaussian_path = eval_load_gaussians(config.trainer, scene)
-
     return config, scene, gaussian_path
 
 def write_ply(filename, xyzs, rgbs=None, normals=None):
@@ -82,8 +80,6 @@ def write_ply(filename, xyzs, rgbs=None, normals=None):
     vertex_element = PlyElement.describe(elements, 'vertex')
     ply_data = PlyData([vertex_element])
     ply_data.write(filename)
-
-
 
 # https://github.com/centreborelli/satnerf/blob/78cabda4ea6e89c0fe09d37fbc149c8ccb706151/eval_s2p.py
 def project_cloud_into_grid(xyz, meta, mode):
@@ -216,7 +212,7 @@ class MeshExtractor:
     """Load a gaussian-model, extract mesh"""
 
     # Path to config YAML file.
-    load_config: Optional[Path] = Path("output/JAX_004/satellite-scaffold-gs/2024-12-10_131604/config.yml")
+    load_config: Optional[Path] = None
     skip_train: bool = False
     skip_test: bool = False
     skip_dsm: bool = False

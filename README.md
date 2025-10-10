@@ -76,8 +76,10 @@ test/
 2. Then, use COLMAP to compute SfM, obtaining the camera intrinsics, extrinsics, and sparse point cloud.  
 
 ```bash
-
-python convert.py -s ./test/scene --use_aligner
+# 如果需要使用分块重建，使用--use_aligner参数，保证重建坐标系与地面平行
+python ./script/convert.py -s ./test/scene --use_aligner
+# 如果不需要
+python ./script/convert.py -s ./test/scene
 ```
 
 The output structure should be as follows: 
@@ -90,7 +92,9 @@ test/
 │   │   ├── IMG_1.jpg
 │   │   ├── ...
 │   ├── sparse/
-│       └──0/
+│       └──0 / cameras.bin 
+│       └──0 / images.bin 
+│       └──0 / points3D.bin 
 ...
 ```
 
@@ -126,31 +130,14 @@ test/
 ...
 ```
 
-## Provided Data
+## Training
 
-### Public Data (copied from [2dgs](https://github.com/hbb1/2d-gaussian-splatting)):
+```bash
+python train.py --help
+python train.py 3dgs --help
+```
 
-- The MipNeRF360 scenes are provided by the paper author [here](https://jonbarron.info/mipnerf360/). 
-- The SfM datasets for Tanks&Temples and Deep Blending are hosted by 3D-Gaussian-Splatting [here](https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/datasets/input/tandt_db.zip).
-- The BungeeNeRF dataset is available in [Google Drive](https://drive.google.com/file/d/1nBLcf9Jrr6sdxKa1Hbd47IArQQ_X8lww/view?usp=sharing)/[百度网盘[提取码:4whv]](https://pan.baidu.com/s/1AUYUJojhhICSKO2JrmOnCA). 
-- The MatrixCity dataset can be downloaded from [Hugging Face](https://huggingface.co/datasets/BoDai/MatrixCity/tree/main)/[Openxlab](https://openxlab.org.cn/datasets/bdaibdai/MatrixCity)/[百度网盘[提取码:hqnn]](https://pan.baidu.com/share/init?surl=87P0e5p1hz9t5mgdJXjL1g). [The point clouds](https://drive.google.com/file/d/1J5sGnKhtOdXpGY0SVt-2D_VmL5qdrIc5/view?usp=sharing) used for training are also available.
-
-### Our Test Data:
-
-- The Lower-Campus dataset is available for download from the official address. This dataset includes raw images, ground truth point clouds.
-
-- The CSU-Library dataset can be downloaded from [Baidu Netdisk](https://pan.baidu.com/s/1XeWPyw9v_0d9vJEzv97cJQ?pwd=gssr). This building-level dataset contains over 300 images and features numerous repeated textures and texture-less areas, making it particularly challenging to work with. 
-
-
-### Custom Data:
-
-For custom data, process the image sequences using [Colmap](https://colmap.github.io/) to obtain the SfM points and camera poses.
-
-If you need to partition the scene, you can use ```colmap model_orientation_aligner``` to automatically align the model’s coordinate axes. However, for large scenes, this process is very time-consuming. Therefore, it is recommended to manually align using [CloudCompare](https://www.cloudcompare.org/).
-
-## How to Use
-
-### Training a small scene
+### Training a small scene (without partition)
 
 1. training
 
@@ -158,13 +145,18 @@ If you need to partition the scene, you can use ```colmap model_orientation_alig
 python train.py octree-2dgs --source-path ./test/scene --output-path ./output
 ```
 
-2. extract mesh
+2. extract mesh (注意3dgs、scaffold-gs、octree-gs都不支持提取Mesh)
 
 ```bash
-python extract_mesh.py --load-config <path to config>
+python ./script/extract_mesh.py --load-config <path to config>
 ```
 
-### Training a large scene
+3. render orthophoto (只支持绝对定向后的模型，推荐使用metashape，然后导出为COLMAP格式)[https://github.com/agisoft-llc/metashape-scripts/blob/43b3d9abf1d9df4821625a90b0b1fe4f4f0c9547/src/export_for_gaussian_splatting.py]
+```bash
+python ./script/render_ortho.py --load-config <path to config>
+```
+
+### Training a large scene (with partition)
 
 1. training
 
@@ -242,6 +234,36 @@ python train.py octree-2dgs --source-path ./test/scene --output-path ./output
 
 python train.py octree-pgsr --source-path ./test/scene --output-path ./output
 ```
+
+
+
+
+
+## Provided Data
+
+### Public Data (copied from [2dgs](https://github.com/hbb1/2d-gaussian-splatting)):
+
+- The MipNeRF360 scenes are provided by the paper author [here](https://jonbarron.info/mipnerf360/). 
+- The SfM datasets for Tanks&Temples and Deep Blending are hosted by 3D-Gaussian-Splatting [here](https://repo-sam.inria.fr/fungraph/3d-gaussian-splatting/datasets/input/tandt_db.zip).
+- The BungeeNeRF dataset is available in [Google Drive](https://drive.google.com/file/d/1nBLcf9Jrr6sdxKa1Hbd47IArQQ_X8lww/view?usp=sharing)/[百度网盘[提取码:4whv]](https://pan.baidu.com/s/1AUYUJojhhICSKO2JrmOnCA). 
+- The MatrixCity dataset can be downloaded from [Hugging Face](https://huggingface.co/datasets/BoDai/MatrixCity/tree/main)/[Openxlab](https://openxlab.org.cn/datasets/bdaibdai/MatrixCity)/[百度网盘[提取码:hqnn]](https://pan.baidu.com/share/init?surl=87P0e5p1hz9t5mgdJXjL1g). [The point clouds](https://drive.google.com/file/d/1J5sGnKhtOdXpGY0SVt-2D_VmL5qdrIc5/view?usp=sharing) used for training are also available.
+
+### Our Test Data:
+
+- The Lower-Campus dataset is available for download from the official address. This dataset includes raw images, ground truth point clouds.
+
+- The CSU-Library dataset can be downloaded from [Baidu Netdisk](https://pan.baidu.com/s/1XeWPyw9v_0d9vJEzv97cJQ?pwd=gssr). This building-level dataset contains over 300 images and features numerous repeated textures and texture-less areas, making it particularly challenging to work with. 
+
+
+### Custom Data:
+
+For custom data, process the image sequences using [Colmap](https://colmap.github.io/) to obtain the SfM points and camera poses.
+
+If you need to partition the scene, you can use ```colmap model_orientation_aligner``` to automatically align the model’s coordinate axes. However, for large scenes, this process is very time-consuming. Therefore, it is recommended to manually align using [CloudCompare](https://www.cloudcompare.org/).
+
+
+
+
 
 ## Acknowledgements
 
