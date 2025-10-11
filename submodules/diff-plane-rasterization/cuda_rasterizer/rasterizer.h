@@ -55,7 +55,10 @@ namespace CudaRasterizer
 			float* out_all_map,
 			float* out_plane_depth,
 			const bool render_geo,
-			bool debug = false);
+			bool debug = false,
+			bool ortho_rendering = false,
+			const float dx = 0.0f, 
+			const float dy = 0.0f);
 
 		static void backward(
 			const int P, int D, int M, int R,

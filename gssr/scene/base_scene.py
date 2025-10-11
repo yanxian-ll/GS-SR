@@ -89,11 +89,11 @@ class Scene(nn.Module):
             else torch.tensor(self.background, dtype=torch.float32, device=self.device)
         return bg
     
-    def generate_gaussians(self, viewpoint_camera):
-        """"""
+    # def generate_gaussians(self, viewpoint_camera):
+    #     """"""
     
-    def generate_ortho_gaussians(self, viewpoint_camera):
-        """"""
+    # def generate_ortho_gaussians(self, viewpoint_camera):
+    #     """"""
     
     def render(self, viewpoint_camera, means3D, opacity, scales, rotations, cov3D_precomp, shs, colors_precomp) -> Dict[str, torch.Tensor]:
         """Rendering"""

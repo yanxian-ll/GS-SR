@@ -6,7 +6,8 @@ conda activate 3dgs
 
 ## install pytorch
 conda install pytorch torchvision torchaudio pytorch-cuda=12.1 -c pytorch -c nvidia
-pip install plyfile tqdm scipy shapely einops lpips torch_scatter jaxtyping opencv-python open3d tensorboard mediapy
+pip install plyfile tqdm scipy shapely einops lpips \
+    torch_scatter jaxtyping opencv-python open3d tensorboard mediapy tyro
 
 ## install submodules
 pip install submodules/simple-knn

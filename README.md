@@ -102,7 +102,7 @@ test/
 
 ```bash
 
-python split_scene.py --source-path ./test/scene
+python ./script/split_scene.py --source-path ./test/scene
 ```
 
 You can manually determine the number of rows (--num-row) and columns (--num-col) for dividing the scene based on the scene range and coordinate system direction. You can also automatically determine the tiling by setting the maximum number of images (--max_num_images) per tile.
@@ -133,8 +133,8 @@ test/
 ## Training
 
 ```bash
-python train.py --help
-python train.py 3dgs --help
+python3 train.py --help
+python3 train.py 3dgs --help
 ```
 
 ### Training a small scene (without partition)
@@ -142,18 +142,18 @@ python train.py 3dgs --help
 1. training
 
 ```bash
-python train.py octree-2dgs --source-path ./test/scene --output-path ./output
+python3 train.py octree-2dgs --source-path ./test/scene --output-path ./output
 ```
 
 2. extract mesh (注意3dgs、scaffold-gs、octree-gs都不支持提取Mesh)
 
 ```bash
-python ./script/extract_mesh.py --load-config <path to config>
+python3 ./script/extract_mesh.py --load-config <path to config> --skip-video
 ```
 
 3. render orthophoto (只支持绝对定向后的模型，推荐使用metashape，然后导出为COLMAP格式)[https://github.com/agisoft-llc/metashape-scripts/blob/43b3d9abf1d9df4821625a90b0b1fe4f4f0c9547/src/export_for_gaussian_splatting.py]
 ```bash
-python ./script/render_ortho.py --load-config <path to config>
+python3 ./script/render_ortho.py --load-config <path to config>
 ```
 
 ### Training a large scene (with partition)
@@ -161,7 +161,7 @@ python ./script/render_ortho.py --load-config <path to config>
 1. training
 
 ```bash
-python train_split.py octree-2dgs --source-path ./test/scene --output-path ./output
+python3 ./script/train_split.py octree-2dgs --source-path ./test/scene --output-path ./output
 ```
 
 The output folder structure should be as follows:
@@ -173,14 +173,14 @@ output/test/octree-2dgs/timestamp/
 │   ├── config.yml
 │   ├── logs
 │   └── pointcloud
-├── ...
+├── tile_0001
 ...
 ```
 
 2. extract mesh
 
 ```bash
-python extract_mesh_split.py --load-config <path to config> --data_device "cpu"
+python3 ./script/extract_mesh_split.py --load-config <path to config> --data_device "cpu"
 ```
 
 Try importing data to the CPU to avoid out-of-memory issues.

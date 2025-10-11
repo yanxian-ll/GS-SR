@@ -37,7 +37,6 @@ class TwoDGSScene(VanillaScene):
         loss_dict["dist_loss"] = lambda_dist * (rend_dist).mean()
         return loss_dict
         
-    
     def render(self, viewpoint_camera, means3D, opacity, scales, rotations, cov3D_precomp, shs, colors_precomp):
         # Create zero tensor. We will use it to make pytorch return gradients of the 2D (screen-space) means
         screenspace_points = torch.zeros_like(means3D, dtype=means3D.dtype, requires_grad=True, device=self.device) + 0
@@ -130,8 +129,8 @@ class TwoDGSScene(VanillaScene):
 
         return rets
     
-
     @torch.no_grad()
     def render_ortho(self, viewpoint_camera, means3D, opacity, scales, rotations, cov3D_precomp, shs, colors_precomp):
        """Not Impletement
        """
+       

@@ -11,6 +11,10 @@ from tqdm import tqdm
 import open3d as o3d
 import gc
 
+import sys
+script_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(script_dir)
+sys.path.insert(0, parent_dir)
 
 from extract_mesh import MeshExtractor, cfg, eval_setup
 from gssr.utils.mesh_utils import GaussianExtractor, to_cam_open3d, post_process_mesh, estimate_bounding_sphere

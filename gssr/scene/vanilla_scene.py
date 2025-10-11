@@ -128,6 +128,10 @@ class VanillaScene(Scene):
                 "radii": radii,
                 "depth": 1.0 / (depth_image)}
     
+    def generate_ortho_gaussians(self, viewpoint_camera):
+        """"""
+        return self.generate_gaussians(viewpoint_camera)
+    
     @torch.no_grad()
     def render_ortho(self, viewpoint_camera, means3D, opacity, scales, rotations, cov3D_precomp, shs, colors_precomp):
         screenspace_points = torch.zeros_like(means3D, dtype=means3D.dtype, requires_grad=True, device=self.device) + 0

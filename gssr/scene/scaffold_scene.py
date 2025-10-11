@@ -59,7 +59,6 @@ class ScaffoldScene(VanillaScene):
         cat_local_view_wodist = torch.cat([feat, ob_view], dim=1) # [N, c+3]
         if self._gaussians.appearance_dim > 0:
             camera_indicies = torch.ones_like(cat_local_view[:,0], dtype=torch.long, device=ob_dist.device) * viewpoint_camera.uid
-            # camera_indicies = torch.ones_like(cat_local_view[:,0], dtype=torch.long, device=ob_dist.device) * 10
             appearance = self._gaussians.get_appearance(camera_indicies)
 
         # get offset's opacity
@@ -225,8 +224,8 @@ class ScaffoldScene(VanillaScene):
         cat_local_view = torch.cat([feat, ob_view, ob_dist], dim=1) # [N, c+3+1]
         cat_local_view_wodist = torch.cat([feat, ob_view], dim=1) # [N, c+3]
         if self._gaussians.appearance_dim > 0:
-            camera_indicies = torch.ones_like(cat_local_view[:,0], dtype=torch.long, device=ob_dist.device) * viewpoint_camera.uid
-            # camera_indicies = torch.ones_like(cat_local_view[:,0], dtype=torch.long, device=ob_dist.device) * 10
+            # 都用第一个相机对应的appearance
+            camera_indicies = torch.zeros_like(cat_local_view[:,0], dtype=torch.long, device=ob_dist.device)
             appearance = self._gaussians.get_appearance(camera_indicies)
 
         # get offset's opacity

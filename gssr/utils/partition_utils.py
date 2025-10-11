@@ -88,7 +88,7 @@ def get_oriented_bounding_box(points:np.ndarray, calcconvexhull=True):
 
 
 def split_points_tile(points:np.ndarray, property:Optional[np.ndarray], 
-                      bbx:Optional[np.ndarray], tile_size:int=200, min_points:int=1000, extent_ratio:float=1.5):
+                      bbx:Optional[np.ndarray], tile_size:float=200.0, min_points:int=1000, extent_ratio:float=1.5):
     """split point cloud based on bounding box.
 
     Parameters:

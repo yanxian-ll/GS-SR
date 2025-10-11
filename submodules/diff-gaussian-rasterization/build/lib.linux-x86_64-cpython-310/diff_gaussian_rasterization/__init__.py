@@ -79,9 +79,17 @@ class _RasterizeGaussians(torch.autograd.Function):
             raster_settings.antialiasing,
             raster_settings.debug
         )
+        if raster_settings.ortho_rendering:
+            args = args + (raster_settings.dx, raster_settings.dy)
 
         # Invoke C++/CUDA rasterizer
-        num_rendered, color, radii, geomBuffer, binningBuffer, imgBuffer, invdepths = _C.rasterize_gaussians(*args)
+        if raster_settings.ortho_rendering:
+            # no need backward for ortho-rendering
+            with torch.no_grad():
+                num_rendered, color, radii, geomBuffer, binningBuffer, imgBuffer, invdepths = \
+                    _C.rasterize_gaussians_ortho(*args)
+        else:
+            num_rendered, color, radii, geomBuffer, binningBuffer, imgBuffer, invdepths = _C.rasterize_gaussians(*args)
 
         # Keep relevant tensors for backward
         ctx.raster_settings = raster_settings
@@ -154,6 +162,10 @@ class GaussianRasterizationSettings(NamedTuple):
     prefiltered : bool
     debug : bool
     antialiasing : bool
+    # only for ortho-rendering
+    ortho_rendering : bool = False
+    dx : float = 0.0
+    dy : float = 0.0
 
 class GaussianRasterizer(nn.Module):
     def __init__(self, raster_settings):

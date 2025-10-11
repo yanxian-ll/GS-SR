@@ -112,6 +112,36 @@ __device__ float3 computeCov2D(const float3& mean, float focal_x, float focal_y,
 	return { float(cov[0][0]), float(cov[0][1]), float(cov[1][1]) };
 }
 
+// Forward version of 2D covariance matrix computation for orthographic rendering
+__device__ float3 computeCov2DOrtho(const float3& mean, float focal_x, float focal_y, float tan_fovx, float tan_fovy, 
+	const float* cov3D, const float* viewmatrix, int w, int h, float dx, float dy)
+{
+	glm::mat3 J = glm::mat3(
+		w/dx, 0.0f, 0.0f,
+		0.0f, h/dy, 0.0f,
+		0.0f, 0.0f, 0.0f);
+
+	glm::mat3 W = glm::mat3(
+		viewmatrix[0], viewmatrix[4], viewmatrix[8],
+		viewmatrix[1], viewmatrix[5], viewmatrix[9],
+		viewmatrix[2], viewmatrix[6], viewmatrix[10]);
+
+	glm::mat3 T = W * J;
+
+	glm::mat3 Vrk = glm::mat3(
+		cov3D[0], cov3D[1], cov3D[2],
+		cov3D[1], cov3D[3], cov3D[4],
+		cov3D[2], cov3D[4], cov3D[5]);
+
+	glm::mat3 cov = glm::transpose(T) * glm::transpose(Vrk) * T;
+
+	// Apply low-pass filter: every Gaussian should be at least
+	// one pixel wide/high. Discard 3rd row and column.
+	cov[0][0] += 0.3f;
+	cov[1][1] += 0.3f;
+	return { float(cov[0][0]), float(cov[0][1]), float(cov[1][1]) };
+}
+
 // Forward method for converting scale and rotation properties of each
 // Gaussian to a 3D covariance matrix in world space. Also takes care
 // of quaternion normalization.
@@ -177,7 +207,10 @@ __global__ void preprocessCUDA(int P, int D, int M,
 	float4* conic_opacity,
 	const dim3 grid,
 	uint32_t* tiles_touched,
-	bool prefiltered)
+	bool prefiltered,
+	bool ortho_rendering,
+	const float dx,
+	const float dy)
 {
 	auto idx = cg::this_grid().thread_rank();
 	if (idx >= P)
@@ -213,7 +246,13 @@ __global__ void preprocessCUDA(int P, int D, int M,
 	}
 
 	// Compute 2D screen-space covariance matrix
-	float3 cov = computeCov2D(p_orig, focal_x, focal_y, tan_fovx, tan_fovy, cov3D, viewmatrix);
+	float3 cov;
+	if (!ortho_rendering){
+		cov = computeCov2D(p_orig, focal_x, focal_y, tan_fovx, tan_fovy, cov3D, viewmatrix);
+	}else{
+		// ortographic rendering
+		cov = computeCov2DOrtho(p_orig, focal_x, focal_y, tan_fovx, tan_fovy, cov3D, viewmatrix, W, H, dx, dy);
+	}
 
 	// Invert covariance (EWA algorithm)
 	float det = (cov.x * cov.z - cov.y * cov.y);
@@ -474,7 +513,10 @@ void FORWARD::preprocess(int P, int D, int M,
 	float4* conic_opacity,
 	const dim3 grid,
 	uint32_t* tiles_touched,
-	bool prefiltered)
+	bool prefiltered,
+	bool ortho_rendering,
+	const float dx,
+	const float dy)
 {
 	preprocessCUDA<NUM_CHANNELS> << <(P + 255) / 256, 256 >> > (
 		P, D, M,
@@ -501,6 +543,8 @@ void FORWARD::preprocess(int P, int D, int M,
 		conic_opacity,
 		grid,
 		tiles_touched,
-		prefiltered
+		prefiltered,
+		ortho_rendering,
+		dx, dy
 		);
 }

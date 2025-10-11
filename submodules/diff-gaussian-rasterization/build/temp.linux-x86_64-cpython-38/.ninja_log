@@ -1,0 +1,6 @@
+# ninja log v5
+1	5157	1760168040720177299	/home/csuzhang/disk/GS-SR/submodules/diff-gaussian-rasterization/build/temp.linux-x86_64-cpython-38/cuda_rasterizer/forward.o	7081aedbf6574781
+0	5366	1760168040929179282	/home/csuzhang/disk/GS-SR/submodules/diff-gaussian-rasterization/build/temp.linux-x86_64-cpython-38/cuda_rasterizer/backward.o	676c2db72d3ed78d
+1	17256	1760168052811292073	/home/csuzhang/disk/GS-SR/submodules/diff-gaussian-rasterization/build/temp.linux-x86_64-cpython-38/cuda_rasterizer/rasterizer_impl.o	ed0d28791c3087ff
+1	34743	1760168070263457974	/home/csuzhang/disk/GS-SR/submodules/diff-gaussian-rasterization/build/temp.linux-x86_64-cpython-38/ext.o	4d706e3f465bdc0e
+2	66864	1760168102372763916	/home/csuzhang/disk/GS-SR/submodules/diff-gaussian-rasterization/build/temp.linux-x86_64-cpython-38/rasterize_points.o	69687e5209168b0

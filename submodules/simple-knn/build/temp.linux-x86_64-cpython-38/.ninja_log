@@ -1,0 +1,4 @@
+# ninja log v5
+1	16997	1760167973256539567	/home/csuzhang/disk/GS-SR/submodules/simple-knn/build/temp.linux-x86_64-cpython-38/simple_knn.o	499991cf5f988271
+1	33228	1760167989475692460	/home/csuzhang/disk/GS-SR/submodules/simple-knn/build/temp.linux-x86_64-cpython-38/ext.o	853524cb28d5be45
+2	65581	1760168021802998011	/home/csuzhang/disk/GS-SR/submodules/simple-knn/build/temp.linux-x86_64-cpython-38/spatial.o	4c55a6d2af849242
