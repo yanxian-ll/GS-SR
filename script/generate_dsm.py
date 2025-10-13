@@ -9,56 +9,25 @@ from dataclasses import dataclass
 from typing import Tuple, Optional
 import numpy as np
 import rasterio
+from tqdm import tqdm
 
-from gssr.configs import base_config as cfg
-from gssr.scene.base_scene import Scene
-from gssr.utils.mesh_utils import GaussianExtractor
-from gssr.utils.point_utils import depths_to_points
-import gssr.utils.dsmr as dsmr
+from plyflatten import plyflatten
+from plyflatten.utils import rasterio_crs, crs_proj
+import affine
+from pyproj import CRS
+
+import sys
+script_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(script_dir)
+sys.path.insert(0, parent_dir)
+
+from utils import eval_setup
 from gssr.utils.metric_utils import evaluate_single
+import gssr.utils.dsmr as dsmr
+from gssr.utils.image_utils import ssim, psnr
+from gssr.utils.render_utils import save_img_f32, save_img_u8, save_vis_depth
 
 CONSOLE = Console(width=120)
-
-def eval_load_gaussians(config: cfg.TrainerConfig, scene: Scene) -> Path:
-    assert config.load_gaussian_dir is not None
-    if config.load_gaussian_step is None:
-        CONSOLE.log(f"Loading latest gaussians from {config.load_gaussian_dir}")
-        if not os.path.exists(config.load_gaussian_dir):
-            CONSOLE.rule("Error", style="red")
-            CONSOLE.print(f"No gaussians directory found at {config.load_gaussian_dir}, ", justify="center")
-            CONSOLE.print(
-                "Please make sure the gaussians exists, they should be generated periodically during training",
-                justify="center",
-            )
-            sys.exit(1)
-        else:
-            load_step = max([int(x[x.find("_") + 1 : x.find(".")]) for x in os.listdir(config.load_gaussian_dir) if x.endswith('.ply')])
-            config.load_gaussian_step = load_step
-    else:
-        load_step = config.load_gaussian_step
-    
-    load_path = config.load_gaussian_dir / f"iteration_{load_step}.ply"
-    scene._gaussians.load_gaussians(load_path)
-    scene._gaussians.load_mlp_checkpoints(config.load_gaussian_dir)
-    CONSOLE.print(f":white_check_mark: Done loading gaussians from {load_path}")
-    return load_path
-
-def eval_setup(config_path: Path, data_device: str = "cuda") -> Tuple[cfg.Config, Scene, Path]:
-    # load save config
-    config = yaml.load(config_path.read_text(), Loader=yaml.Loader)
-    assert isinstance(config, cfg.Config)
-
-    config.trainer.load_gaussian_dir = config.get_gaussian_dir()
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    # setup scene (which includes the dataloader and gaussians)
-    config.scene.dataloader.device = data_device
-    scene = config.scene.setup(source_dir = config.source_path, eval = config.eval, device = device)
-    assert isinstance(scene, Scene)
-
-    # load gaussians information
-    gaussian_path = eval_load_gaussians(config.trainer, scene)
-    return config, scene, gaussian_path
 
 def write_ply(filename, xyzs, rgbs=None, normals=None):
     from plyfile import PlyElement, PlyData
@@ -130,8 +99,6 @@ def project_cloud_into_grid(xyz, meta, mode):
     raw_map_np = np.flipud(raw_map_np)
     return raw_map_np
 
-
-from gssr.utils.render_utils import save_img_f32, save_img_u8, save_vis_depth
 def export_image(path, viewpoint_stack, rgbmaps, depthmaps, normals):
     render_path = os.path.join(path, "renders")
     gts_path = os.path.join(path, "gt")
@@ -157,10 +124,6 @@ def export_image(path, viewpoint_stack, rgbmaps, depthmaps, normals):
             save_vis_depth(depthmaps[idx][0].cpu().numpy(), lo, hi, os.path.join(vis_path, 'depth_vis_{0:05d}'.format(idx) + ".png"))
         if len(normals) > 0:
             save_img_u8(normals[idx].permute(1,2,0).cpu().numpy() * 0.5 + 0.5, os.path.join(vis_path, 'normal_{0:05d}'.format(idx) + ".png"))
-
-
-from tqdm import tqdm
-from gssr.utils.image_utils import ssim, psnr
 
 def reconstruction(render, train_viewpoint_stack, test_viewpoint_stack, train_dir, test_dir):
     # recon train
@@ -203,25 +166,57 @@ def reconstruction(render, train_viewpoint_stack, test_viewpoint_stack, train_di
             normalmaps.append(normals[idx])
         if len(depths) > 0:
             depthmaps.append(depths[idx])
-    export_image(test_dir, test_viewpoint_stack, rgbmaps, depthmaps, normalmaps)
+    if (len(depthmaps) > 0):
+        export_image(test_dir, test_viewpoint_stack, rgbmaps, depthmaps, normalmaps)
     return train_rgbmaps, train_depthmaps
 
+def depth_to_world_points(depth_map, view):
+    if depth_map.dim() == 3:
+        depth_map = depth_map.squeeze(0)  # (1, H, W) -> (H, W)
+    
+    H, W = depth_map.shape
+    device = depth_map.device
+    dtype = depth_map.dtype
+    
+    W2C = np.zeros((4, 4))
+    W2C[:3, :3] = view.R.transpose()
+    W2C[:3, 3] = view.T
+    W2C[3, 3] = 1.0
+    C2W = torch.tensor(W2C, device=device, dtype=dtype).inverse()
+
+    u = torch.arange(W, device=device, dtype=dtype)
+    v = torch.arange(H, device=device, dtype=dtype)
+    u, v = torch.meshgrid(u, v, indexing='xy')  # (H, W)
+
+    Z = depth_map  # (H, W)
+    X = (u - view.Cx) * Z / view.Fx  # (H, W)
+    Y = (v - view.Cy) * Z / view.Fy  # (H, W)
+    
+    points_cam = torch.stack([X, Y, Z], dim=-1)  # (H, W, 3)    
+    points_cam_flat = points_cam.reshape(-1, 3)  # (H*W, 3)    
+    points_cam_flat_t = torch.concatenate([
+        points_cam_flat.t(), \
+        torch.ones((1, points_cam_flat.shape[0]), device=device, dtype=dtype)], dim=0)  # (4, N)    
+    points_world = C2W @ points_cam_flat_t  # (4, H*W)
+    points_world = points_world.t()[:,:3]  # (H*W, 3)
+    return points_world
 
 @dataclass
-class MeshExtractor:
-    """Load a gaussian-model, extract mesh"""
-
+class DSMGenerator:
+    """Load a gaussian-model, generate dsm"""
     # Path to config YAML file.
-    load_config: Optional[Path] = None
-    skip_train: bool = False
-    skip_test: bool = False
-    skip_dsm: bool = False
+    load_config: Path = Path()
     # num images selected for merge
-    num_images: int = 10
+    num_images: int = -1
+    resolution: float = 0.5  # meter
     # merge mode (avg med min max)
     mode: str = 'med'
-
     data_device: str = "cuda"
+    # Whether to compute metrics
+    compute_metrics: bool = False
+    metadata_file: Optional[Path] = None
+    gt_dsm_file: Optional[Path] = None
+    gt_mask_path: Optional[Path] = None
 
     def main(self, load_config=None):
         """Main function."""
@@ -229,68 +224,81 @@ class MeshExtractor:
         train_cams = scene.dataloader.getTrainData()
         test_cams = scene.dataloader.getTestData()
 
-        ## setup 
+        ## setup
         train_dir = os.path.join(config.get_base_dir(), 'train', "ours_{}".format(config.trainer.load_gaussian_step))
         test_dir = os.path.join(config.get_base_dir(), 'test', "ours_{}".format(config.trainer.load_gaussian_step))
-        # gaussExtractor = GaussianExtractor(scene.eval_render)
 
         rgbmaps, depthmaps = reconstruction(scene.eval_render, train_cams, test_cams, train_dir, test_dir)
         train_psnr, train_ssim = evaluate_single(os.path.join(train_dir, 'renders'), os.path.join(train_dir, 'gt'))
-        test_psnr, test_ssim = evaluate_single(os.path.join(test_dir, 'renders'), os.path.join(test_dir, 'gt'))
+        if len(test_cams) > 0:
+            test_psnr, test_ssim = evaluate_single(os.path.join(test_dir, 'renders'), os.path.join(test_dir, 'gt'))
 
-        # if not self.skip_train:
-        #     CONSOLE.log("export training images ...")
-        #     os.makedirs(train_dir, exist_ok=True)
-            # gaussExtractor.reconstruction(train_cams)
-            # gaussExtractor.export_image(train_dir)
-            # psnr, ssim = evaluate_single(os.path.join(train_dir, 'renders'), os.path.join(train_dir, 'gt'))
+        if self.num_images < 0:
+            self.num_images = len(train_cams)
 
-        # if (not self.skip_test) and (len(test_cams) > 0):
-        #     CONSOLE.log("export rendered testing images ...")
-        #     os.makedirs(test_dir, exist_ok=True)
-            # gaussExtractor.reconstruction(test_cams)
-            # gaussExtractor.export_image(test_dir)
-            # psnr, ssim = evaluate_single(os.path.join(test_dir, 'renders'), os.path.join(test_dir, 'gt'))
+        # sort according to angle
+        list_angles = []
+        for cam in train_cams:
+            w2c = cam.world_view_transform.T.detach().cpu().numpy()
+            c2w = np.linalg.inv(w2c)
+            ndir = c2w[:3, 2]
+            true_ndir = np.array([0.0, 0.0, -1.0])
+            dot_product = np.dot(ndir, true_ndir)
+            cos_theta = dot_product / (np.linalg.norm(ndir)*np.linalg.norm(true_ndir))
+            angle_rad = np.arccos(cos_theta)
+            list_angles.append(np.degrees(angle_rad))
+        num_images = self.num_images if self.num_images < len(train_cams) else len(train_cams)
+        sorted_index = np.argsort(np.array(list_angles))[:num_images]
 
+        # save as point cloud
+        dsm_dir = os.path.join(config.get_base_dir(), 'train', "ours_{}".format(config.trainer.load_gaussian_step), 'dsm')
+        os.makedirs(dsm_dir, exist_ok=True)
+        list_xyz = []
+        for idx in tqdm(sorted_index, desc="export point clouds"):
+            depthmap = depthmaps[idx]
+            rgbmap = rgbmaps[idx].permute(1,2,0)
 
-        if not self.skip_dsm:
-            CONSOLE.log("generate dsm ...")
-            os.makedirs(train_dir, exist_ok=True)
-            # gaussExtractor.reconstruction(train_cams)
+            cam = train_cams[idx]
+            points = depth_to_world_points(depthmap.cuda(), cam).detach().cpu().numpy()
+            points *= scene.dataloader.config.scene_scale
+            points[:, 0] += scene.dataloader.config.t_x
+            points[:, 1] += scene.dataloader.config.t_y
+            points[:, 2] += scene.dataloader.config.t_z
+            list_xyz.append(points)
+            rgbs = (rgbmap.reshape(-1, 3).detach().cpu().numpy() * 255).astype(np.int8)
+            write_ply(os.path.join(dsm_dir, '{0:05d}'.format(idx) + ".ply"), points, rgbs)
+        
+            # Flatten point clouds
+            xmin, xmax = points[:, 0].min(), points[:, 0].max()
+            ymin, ymax = points[:, 1].min(), points[:, 1].max()
+            xoff = np.floor(xmin / self.resolution) * self.resolution
+            xsize = int(1 + np.floor((xmax - xoff) / self.resolution))
+            yoff = np.ceil(ymax / self.resolution) * self.resolution
+            ysize = int(1 - np.floor((ymin - yoff) / self.resolution))
 
-            # sort
-            list_angles = []
-            for cam in train_cams:
-                w2c = cam.world_view_transform.T.detach().cpu().numpy()
-                c2w = np.linalg.inv(w2c)
-                ndir = c2w[:3, 2]
-                true_ndir = np.array([0.0, 0.0, -1.0])
-                dot_product = np.dot(ndir, true_ndir)
-                cos_theta = dot_product / (np.linalg.norm(ndir)*np.linalg.norm(true_ndir))
-                angle_rad = np.arccos(cos_theta)
-                list_angles.append(np.degrees(angle_rad))
-            num_images = self.num_images if self.num_images < len(train_cams) else len(train_cams)
-            sorted_index = np.argsort(np.array(list_angles))[:num_images]
+            with open(os.path.join(dsm_dir, '{0:05d}'.format(idx) + "_enu_bbx.txt"), 'w') as f:
+                f.write(f"{xoff}\n{yoff}\n{xsize}\n{ysize}\n{self.resolution}")
 
-            # save as point cloud
-            ply_dir = os.path.join(config.get_base_dir(), 'train', "ours_{}".format(config.trainer.load_gaussian_step), 'ply')
-            os.makedirs(ply_dir, exist_ok=True)
-            list_xyz = []
-            for idx in sorted_index:
-                # depthmap = gaussExtractor.depthmaps[idx]
-                # rgbmap = gaussExtractor.rgbmaps[idx].permute(1,2,0)
-                depthmap = depthmaps[idx]
-                rgbmap = rgbmaps[idx].permute(1,2,0)
+            # run plyflatten
+            dsm = plyflatten(points, xoff, yoff, self.resolution, xsize, ysize, radius=1, sigma=float("inf"))
+            profile = {}
+            profile["dtype"] = dsm.dtype
+            profile["height"] = dsm.shape[0]
+            profile["width"] = dsm.shape[1]
+            profile["count"] = 1
+            profile["driver"] = "GTiff"
+            profile["nodata"] = float("nan")
+            profile["crs"] = None
+            profile["transform"] = affine.Affine(self.resolution, 0.0, xoff, 0.0, -self.resolution, yoff)
 
-                cam = train_cams[idx]
-                points = depths_to_points(cam, depthmap.cuda()).detach().cpu().numpy() * scene.dataloader.config.scene_scale
-                rgbs = (rgbmap.reshape(-1, 3).detach().cpu().numpy() * 255).astype(np.int8)
-                write_ply(os.path.join(ply_dir,  '{0:05d}'.format(idx) + ".ply"), points, rgbs)
-                list_xyz.append(points)
-            
-            metadata_file = os.path.join(config.source_path, 'preprocess/enu_DSM.txt')
-            gt_dsm_file = os.path.join(config.source_path, "preprocess/enu_DSM.tif")
-            gt_mask_path = os.path.join(config.source_path, "preprocess/enu_CLS.tif")
+            with rasterio.open(os.path.join(dsm_dir, '{0:05d}'.format(idx) + ".tif"), "w", **profile) as f:
+                f.write(dsm[:, :, 0], 1)
+        
+        # Only compute metrics if enabled and GT paths are provided in config
+        if self.compute_metrics and self.gt_dsm_file and self.metadata_file:
+            metadata_file = self.metadata_file
+            gt_dsm_file = self.gt_dsm_file
+            gt_mask_path = self.gt_mask_path
 
             output_path = os.path.join(config.get_base_dir(), 'metric')
             os.makedirs(output_path, exist_ok=True)
@@ -317,8 +325,7 @@ class MeshExtractor:
 
             pred_dsm = project_cloud_into_grid(xyz[mask], [easting, northing, pixels, gsd], mode=self.mode)
 
-            
-            if gt_mask_path is not None:
+            if gt_mask_path is not None and os.path.exists(gt_mask_path):
                 with rasterio.open(gt_mask_path, "r") as f:
                     mask = f.read()[0, :, :]
                     water_mask = mask.copy()
@@ -326,17 +333,17 @@ class MeshExtractor:
                     water_mask[mask == 9] = 1
             else:
                 water_mask = np.zeros_like(pred_dsm).astype(bool)
-        
+            
             with rasterio.open(pred_dsm_file,  "w", **profile) as f:
                 pred_dsm[water_mask.astype(bool)] = np.nan
                 f.write(pred_dsm, 1)
-            
+                
             # register and compute mae
-            transform = dsmr.compute_shift(gt_dsm_file, pred_dsm_file, scaling=False)
+            transform = dsmr.compute_shift(self.gt_dsm_file, pred_dsm_file, scaling=False)
             dsmr.apply_shift(pred_dsm_file, pred_rdsm_file, *transform)
             with rasterio.open(pred_rdsm_file, 'r') as f:
                 pred_rdsm = f.read()[0, :, :]
-            
+                
             error = pred_rdsm - gt_dsm
             with rasterio.open(out_err_file, 'w', **profile) as dst:
                 dst.write(error, 1)
@@ -351,18 +358,19 @@ class MeshExtractor:
 
             # save as ply
             enu_e, enu_n = np.meshgrid(np.linspace(easting, easting + pixels * gsd, pred_dsm.shape[1]),
-                                    np.linspace(northing + (pixels - 1) * gsd, northing - 1 * gsd, pred_dsm.shape[0]))
+                                        np.linspace(northing + (pixels - 1) * gsd, northing - 1 * gsd, pred_dsm.shape[0]))
             enu_e = enu_e.reshape((-1))
             enu_n = enu_n.reshape((-1))
             enu_u = pred_dsm.reshape((-1))
             mask = (enu_u <= gt_max) & (enu_u >= gt_min)
             write_ply(pred_point_cloud_file, np.vstack([enu_e[mask], enu_n[mask], enu_u[mask]]).T)
-
+        else:
+            CONSOLE.print("[yellow]Skipping metric computation: compute_metrics is False or dsm_metadata not found in config[/yellow]")
 
 def entrypoint():
     """Entrypoint for use with pyproject scripts."""
     tyro.extras.set_accent_color("bright_yellow")
-    tyro.cli(MeshExtractor).main()
+    tyro.cli(DSMGenerator).main()
 
 if __name__ == "__main__":
     entrypoint()

@@ -123,12 +123,12 @@ class ColmapDataLoaderConfig(DataLoaderConfig):
     _target: Type = field(default_factory=lambda: ColmapDataLoader)
     # scale scene
     scale_scene: bool = True
-    scene_scale: float = None
+    scene_scale: float = 1.0
     scene_percent: float = 0.2
     # translate
-    t_x: float = None
-    t_y: float = None
-    t_z: float = None
+    t_x: float = 0.0
+    t_y: float = 0.0
+    t_z: float = 0.0
     # sampling
     sampling_ratio: float = -1
 
@@ -191,7 +191,6 @@ class ColmapDataLoader(DataLoader):
         
         # after scale the scene, then compute nerf_normalization
         scene_info.nerf_normalization = getNerfppNorm(scene_info.train_cameras)
-        
         self.cameras_extent = scene_info.nerf_normalization["radius"]
 
         # samling
@@ -203,7 +202,6 @@ class ColmapDataLoader(DataLoader):
             scene_info.point_cloud.points = points[indices]
             scene_info.point_cloud.colors = colors[indices]
             scene_info.point_cloud.normals = normals[indices]
-
         self.point_cloud = scene_info.point_cloud
 
         for resolution_scale in self.config.resolution_scales:

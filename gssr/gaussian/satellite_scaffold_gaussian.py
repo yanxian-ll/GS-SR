@@ -215,7 +215,6 @@ class SatelliteScaffoldGaussian(VanillaGaussian):
             torch.nn.Sigmoid(),
         ).to(device)
 
-
         self.mlp_transient_encoding = nn.Sequential(
             torch.nn.Linear(self.feat_dim+self.appearance_dim, self.feat_dim//2),
             torch.nn.ReLU(),
@@ -235,16 +234,12 @@ class SatelliteScaffoldGaussian(VanillaGaussian):
             torch.nn.Softplus(),
         ).to(device)
     
-    
     def eval(self):
         self.mlp_feature_bank.eval()
-
         self.mlp_opacity.eval()
         self.mlp_cov.eval()
         self.mlp_color.eval()
-
         self.mlp_sky_color.eval()
-
         if self.appearance_dim > 0:
             self.embedding_appearance.eval()
         self.mlp_transient_encoding.eval()
@@ -253,19 +248,15 @@ class SatelliteScaffoldGaussian(VanillaGaussian):
 
     def train(self):
         self.mlp_feature_bank.train()
-
         self.mlp_opacity.train()
         self.mlp_cov.train()
         self.mlp_color.train()                
-        
         self.mlp_sky_color.train()
-
         if self.appearance_dim > 0:
             self.embedding_appearance.train()  
         self.mlp_transient_encoding.train()
         self.mlp_transient.train()
         self.mlp_uncertainty.train()
-
 
     def capture(self):
         return (
@@ -300,7 +291,6 @@ class SatelliteScaffoldGaussian(VanillaGaussian):
     def set_appearance(self, num_cameras):
         if self.appearance_dim > 0:
             self.embedding_appearance = Embedding(num_cameras, self.appearance_dim).to(self.device)
-        
         # color affine
         affine = torch.ones((num_cameras, 2), dtype=torch.float32, device=self.device)
         affine[:, 1:2] *= 1e-10
@@ -377,15 +367,14 @@ class SatelliteScaffoldGaussian(VanillaGaussian):
     def get_opacity(self):
         return self.opacity_activation(self._opacity)
 
-    def voxelize_sample(self, data=None, voxel_size=0.01):
+    def voxelize_sample(self, data, voxel_size=0.01):
         np.random.shuffle(data)
-        data = np.unique(np.round(data/voxel_size), axis=0)*voxel_size    
+        data = np.unique(np.round(data / voxel_size), axis=0) * voxel_size
         return data
     
     def create_from_data(self, pcd: BasicPointCloud, cameras: Dict, spatial_lr_scale: float):
         self.spatial_lr_scale = spatial_lr_scale
         points = pcd.points[::self.config.sampling_interval]
-
         if self.voxel_size <= 0:
             init_points = torch.tensor(points).float().cuda()
             init_dist = distCUDA2(init_points).float().cuda()
@@ -394,14 +383,12 @@ class SatelliteScaffoldGaussian(VanillaGaussian):
             del init_dist
             del init_points
             torch.cuda.empty_cache()
-
         print(f'Initial voxel_size: {self.voxel_size}')
         
         points = self.voxelize_sample(points, voxel_size=self.voxel_size)
         fused_point_cloud = torch.tensor(np.asarray(points)).float().cuda()
         offsets = torch.zeros((fused_point_cloud.shape[0], self.n_offsets, 3)).float().cuda()
         anchors_feat = torch.zeros((fused_point_cloud.shape[0], self.feat_dim)).float().cuda()
-        
         print("Number of points at initialisation : ", fused_point_cloud.shape[0])
 
         dist2 = torch.clamp_min(distCUDA2(fused_point_cloud).float().cuda(), 0.0000001)
@@ -497,8 +484,6 @@ class SatelliteScaffoldGaussian(VanillaGaussian):
                                                     lr_delay_mult=self.config.mlp_color_lr_delay_mult,
                                                     max_steps=self.config.mlp_color_lr_max_steps)
         
-        
-
         self.mlp_featurebank_scheduler_args = get_expon_lr_func(lr_init=self.config.mlp_featurebank_lr_init,
                                                     lr_final=self.config.mlp_featurebank_lr_final,
                                                     lr_delay_mult=self.config.mlp_featurebank_lr_delay_mult,
@@ -556,8 +541,6 @@ class SatelliteScaffoldGaussian(VanillaGaussian):
             if param_group['lr'] == "embedding_affine":
                 lr = self.affine_scheduler_args(step)
                 param_group['lr'] = lr
-
-    
 
     def construct_list_of_attributes(self):
         l = ['x', 'y', 'z', 'nx', 'ny', 'nz']
@@ -656,9 +639,7 @@ class SatelliteScaffoldGaussian(VanillaGaussian):
             else:
                 group["params"][0] = nn.Parameter(torch.cat((group["params"][0], extension_tensor), dim=0).requires_grad_(True))
                 optimizable_tensors[group["name"]] = group["params"][0]
-
         return optimizable_tensors
-
 
     # statis grad information to guide liftting. 
     def training_statis(self, viewspace_point_tensor, opacity, update_filter, offset_selection_mask, anchor_visible_mask):
@@ -727,7 +708,6 @@ class SatelliteScaffoldGaussian(VanillaGaussian):
         self._rotation = optimizable_tensors["rotation"]
         return valid_points_mask
 
-    
     def anchor_growing(self, grads, threshold, offset_mask):
         init_length = self.get_anchor.shape[0]*self.n_offsets
         for i in range(self.update_depth):
@@ -760,9 +740,7 @@ class SatelliteScaffoldGaussian(VanillaGaussian):
 
             selected_xyz = all_xyz.view([-1, 3])[candidate_mask]
             selected_grid_coords = torch.round(selected_xyz / cur_size).int()
-
             selected_grid_coords_unique, inverse_indices = torch.unique(selected_grid_coords, return_inverse=True, dim=0)
-
 
             ## split data for reducing peak memory calling
             use_chunk = True
@@ -781,7 +759,6 @@ class SatelliteScaffoldGaussian(VanillaGaussian):
             remove_duplicates = ~remove_duplicates
             candidate_anchor = selected_grid_coords_unique[remove_duplicates]*cur_size
 
-            
             if candidate_anchor.shape[0] > 0:
                 new_scaling = torch.ones_like(candidate_anchor).repeat([1,2]).float().cuda()*cur_size # *0.05
                 new_scaling = torch.log(new_scaling)
@@ -805,7 +782,6 @@ class SatelliteScaffoldGaussian(VanillaGaussian):
                     "opacity": new_opacities,
                 }
                 
-
                 temp_anchor_demon = torch.cat([self.anchor_demon, torch.zeros([new_opacities.shape[0], 1], device='cuda').float()], dim=0)
                 del self.anchor_demon
                 self.anchor_demon = temp_anchor_demon
@@ -909,7 +885,6 @@ class SatelliteScaffoldGaussian(VanillaGaussian):
         ]
         return callbacks
 
-
     def save_mlp_checkpoints(self, path):
         if self.config.save_ckpt_mode == 'split':
 
@@ -932,7 +907,6 @@ class SatelliteScaffoldGaussian(VanillaGaussian):
             color_mlp = torch.jit.trace(self.mlp_color, (torch.rand(1, self.feat_dim).cuda()))
             color_mlp.save(os.path.join(path, 'color_mlp.pt'))
             self.mlp_color.train()
-
 
             self.mlp_sky_color.eval()
             color_mlp = torch.jit.trace(self.mlp_sky_color, (torch.rand(1, self.mapping_view_dim).cuda()))
@@ -959,10 +933,8 @@ class SatelliteScaffoldGaussian(VanillaGaussian):
                 emd = torch.jit.trace(self.embedding_appearance, (torch.zeros((1,), dtype=torch.long).cuda()))
                 emd.save(os.path.join(path, 'embedding_appearance.pt'))
                 self.embedding_appearance.train()
-            
             torch.save(self.color_affine, 'affine.pt')
                 
-
         elif self.config.save_ckpt_mode == 'unite':
             if self.appearance_dim > 0:
                 torch.save({
@@ -993,7 +965,6 @@ class SatelliteScaffoldGaussian(VanillaGaussian):
                     }, os.path.join(path, 'checkpoints.pth'))
         else:
             raise NotImplementedError
-
 
     def load_mlp_checkpoints(self, path):#split or unite
         if self.config.save_ckpt_mode == 'split':

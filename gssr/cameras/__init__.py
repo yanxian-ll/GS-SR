@@ -138,19 +138,18 @@ class MiniCam:
 
 
 class OrthoCamera(Camera):
-    def __init__(self, colmap_id, R, T, FoVx, FoVy, image, gt_alpha_mask, image_name, uid, bbx, resolution_scale=1.0, zfar=100, znear=0.01, trans=np.array([0, 0, 0]), scale=1, data_device="cuda"):
+    def __init__(self, colmap_id, R, T, FoVx, FoVy, image, gt_alpha_mask, image_name, uid, ground_width, ground_height, 
+                 resolution_scale=1.0, zfar=100, znear=0.01, trans=np.array([0, 0, 0]), scale=1, data_device="cuda"):
         super().__init__(colmap_id, R, T, FoVx, FoVy, image, gt_alpha_mask, image_name, uid, resolution_scale, zfar, znear, trans, scale, data_device)
-        self.bbx = bbx
-        mx, Mx, my, My = bbx[0], bbx[1], bbx[2], bbx[3]
-        self.ground_width = Mx - mx
-        self.ground_height = My - my
+        self.ground_width = ground_width
+        self.ground_height = ground_height
         
         self.ortho_view = torch.tensor([1, 1, -1], dtype=torch.float32).cuda()
 
         # update Projection-Matrix & Full-proj-transform
         self.projection_matrix = torch.tensor([
-            [2/(Mx-mx), 0, 0, 0],
-            [0, 2/(My-my), 0, 0],
+            [2/(self.ground_width), 0, 0, 0],
+            [0, 2/(self.ground_height), 0, 0],
             [0, 0, 1, 0],
             [0, 0, 0, 1]], dtype=torch.float32).transpose(0,1).cuda()
         self.full_proj_transform = (self.world_view_transform.unsqueeze(0).bmm(self.projection_matrix.unsqueeze(0))).squeeze(0)
@@ -246,24 +245,22 @@ class SunCamera(Camera):
 
 class SatelliteCamera(Camera):
     def __init__(self, colmap_id, R, T, FoVx, FoVy, image, gt_alpha_mask, image_name, uid, 
-                 mean_alt, scene_bbx, sun_view, sun_dist,
-                 resolution_scale=1, zfar=100, znear=0.01, trans=np.array([0, 0, 0]), scale=1, data_device="cuda"):
+                 mean_alt, scene_bbx, sun_view, sun_dist, resolution_scale=1, zfar=100, znear=0.01, trans=np.array([0, 0, 0]), scale=1, data_device="cuda"):
         super().__init__(colmap_id, R, T, FoVx, FoVy, image, gt_alpha_mask, image_name, uid, resolution_scale, zfar, znear, trans, scale, data_device)
         
         self.mean_alt = mean_alt
-        
         self.fx_z0 = self.Fx / self.mean_alt
         self.fy_z0 = self.Fy / self.mean_alt
 
         # setup suncamera
-        self.sun_camera = SunCamera(
-            uid=self.uid,
-            gsd=(1.0/self.fx_z0 + 1.0/self.fy_z0)/2.0,
-            scene_bbx=scene_bbx,
-            sun_view=sun_view,
-            sun_dist=sun_dist
-        )
-
+        if sun_view is not None:
+            self.sun_camera = SunCamera(
+                uid=self.uid,
+                gsd=(1.0/self.fx_z0 + 1.0/self.fy_z0)/2.0,
+                scene_bbx=scene_bbx,
+                sun_view=sun_view,
+                sun_dist=sun_dist
+            )
 
         # self.projection_matrix = torch.tensor([
         #     [self.fx_z0 * (2 / self.image_width), 0, 0, 0],

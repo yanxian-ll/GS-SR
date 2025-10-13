@@ -23,7 +23,6 @@ class SatelliteScaffoldScene(VanillaScene):
         self._gaussians.set_appearance(len(self.dataloader.getTrainData()))  # set appearance first
         self._gaussians.train()
     
-
     def render(self, viewpoint_camera, means3D, opacity, scales, rotations, cov3D_precomp, shs, colors_precomp):
         from satellite_diff_gaussian_rasterization import GaussianRasterizationSettings as SatelliteGaussianRasterizationSettings
         from satellite_diff_gaussian_rasterization import GaussianRasterizer as SatelliteGaussianRasterizer

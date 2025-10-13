@@ -126,11 +126,90 @@ class TwoDGSScene(VanillaScene):
                 'depth': surf_depth,
                 'normal': render_normal,
         })
-
         return rets
     
     @torch.no_grad()
     def render_ortho(self, viewpoint_camera, means3D, opacity, scales, rotations, cov3D_precomp, shs, colors_precomp):
-       """Not Impletement
-       """
-       
+       # Create zero tensor. We will use it to make pytorch return gradients of the 2D (screen-space) means
+        screenspace_points = torch.zeros_like(means3D, dtype=means3D.dtype, requires_grad=True, device=self.device) + 0
+        try:
+            screenspace_points.retain_grad()
+        except:
+            pass
+
+        # Set up rasterization configuration
+        tanfovx = math.tan(viewpoint_camera.FoVx * 0.5)
+        tanfovy = math.tan(viewpoint_camera.FoVy * 0.5)
+
+        raster_settings = GaussianRasterizationSettings(
+            image_height=int(viewpoint_camera.image_height),
+            image_width=int(viewpoint_camera.image_width),
+            tanfovx=tanfovx,
+            tanfovy=tanfovy,
+            bg=self.background,
+            scale_modifier=self.config.scaling_modifier,
+            viewmatrix=viewpoint_camera.world_view_transform,
+            projmatrix=viewpoint_camera.full_proj_transform,
+            sh_degree=self._gaussians.active_sh_degree,
+            campos=viewpoint_camera.camera_center,
+            prefiltered=False,
+            debug=self.config.debug
+        )
+
+        rasterizer = GaussianRasterizer(raster_settings=raster_settings)
+
+        means2D = screenspace_points
+        
+        rendered_image, radii, allmap = rasterizer(
+            means3D = means3D,
+            means2D = means2D,
+            shs = shs,
+            colors_precomp = colors_precomp,
+            opacities = opacity,
+            scales = scales,
+            rotations = rotations,
+            cov3D_precomp = cov3D_precomp
+        )
+        
+        # Those Gaussians that were frustum culled or had a radius of 0 were not visible.
+        # They will be excluded from value updates used in the splitting criteria.
+        rets =  {"render": rendered_image,
+                "viewspace_points": means2D,
+                "visibility_filter" : radii > 0,
+                "radii": radii,
+        }
+
+        # additional regularizations
+        render_alpha = allmap[1:2]
+
+        # get normal map
+        # transform normal from view space to world space
+        render_normal = allmap[2:5]
+        render_normal = (render_normal.permute(1,2,0) @ (viewpoint_camera.world_view_transform[:3,:3].T)).permute(2,0,1)
+        
+        # get median depth map
+        render_depth_median = allmap[5:6]
+        render_depth_median = torch.nan_to_num(render_depth_median, 0, 0)
+
+        # get expected depth map
+        render_depth_expected = allmap[0:1]
+        render_depth_expected = (render_depth_expected / (render_alpha + 1e-6))
+        render_depth_expected = torch.nan_to_num(render_depth_expected, 0, 0)
+        
+        # get depth distortion map
+        render_dist = allmap[6:7]
+
+        # psedo surface attributes
+        # surf depth is either median or expected by setting depth_ratio to 1 or 0
+        # for bounded scene, use median depth, i.e., depth_ratio = 1; 
+        # for unbounded scene, use expected depth, i.e., depth_ration = 0, to reduce disk anliasing.
+        surf_depth = render_depth_expected * (1-self.config.depth_ratio) + (self.config.depth_ratio) * render_depth_median
+        
+        rets.update({
+                'rend_alpha': render_alpha,
+                'rend_dist': render_dist,
+                'depth': surf_depth,
+                'normal': render_normal,
+        })
+        return rets
+    

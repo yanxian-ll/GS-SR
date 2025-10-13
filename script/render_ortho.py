@@ -22,30 +22,12 @@ from utils import eval_setup
 
 CONSOLE = Console(width=120)
 
-
-# import rasterio
-# from rasterio.transform import from_origin
-# def write_georeference(image_path, output_path, ulx, uly, pixel_size):
-#     with rasterio.open(image_path) as src:
-#         profile = src.profile
-
-#         # 更新地理参考信息
-#         transform = from_origin(ulx, uly, pixel_size, -pixel_size)
-#         profile.update({
-#             'transform': transform,
-#             'crs': 'EPSG:4326'  # 假设使用 WGS84 坐标系
-#         })
-
-#     # 写入新的影像文件
-#     with rasterio.open(output_path, 'w', **profile) as dst:
-#         dst.write(src.read())
-
 @dataclass
 class OrthoRender:
     """Load a gaussian-model, extract mesh"""
 
     # Path to config YAML file.
-    load_config: Path = None
+    load_config: Path = Path()
 
     # iterations of gaussians to load, if None, load the latest one
     iterations: Optional[int] = None
@@ -107,18 +89,24 @@ class OrthoRender:
 
             FovX = focal2fov(fx, image_width)
             FovY = focal2fov(fy, image_height)
-            gt_image = torch.ones((3, image_height, image_width), dtype=float)
+            gt_image = torch.ones((3, image_height, image_width), dtype=torch.float32)
             loaded_mask = None
             image_name = f"tile_{tile['tile_id']}"
 
+            ground_width = Mx - mx
+            ground_height = My - my
+
             camera_id = 50
-            cameras.append(
-                OrthoCamera(colmap_id=camera_id, R=R, T=T, 
-                        FoVx=FovX, FoVy=FovY, bbx=[mx, Mx, my, My],
-                        image=gt_image, gt_alpha_mask=loaded_mask,
-                        image_name=image_name, uid=camera_id, 
-                        data_device=self.data_device)
-                )
+            ortho_cam = OrthoCamera(
+                colmap_id=camera_id, R=R, T=T,
+                FoVx=FovX, FoVy=FovY,
+                ground_width=ground_width, ground_height=ground_height,
+                image=gt_image, gt_alpha_mask=loaded_mask,
+                image_name=image_name, uid=camera_id,
+                data_device=self.data_device
+            )
+            setattr(ortho_cam, "bbx", [mx, Mx, my, My])
+            cameras.append(ortho_cam)
         return cameras
 
     def calculate_gsd(self, scene):
@@ -202,7 +190,6 @@ class OrthoRender:
                     
                     distance_limits = np.percentile(depth.flatten(), [3, 100 - 3])
                     lo, hi = [x for x in distance_limits]
-                    # lo, hi = [np.log(x-lo) for x in distance_limits]
                     save_vis_depth(depth, lo, hi, os.path.join(vis_path, 'depth_vis_{0:05d}'.format(idx) + ".png"))
 
                 with open(os.path.join(coordinate_path, '{0:05d}'.format(idx) + ".txt"), 'w') as f:

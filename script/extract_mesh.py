@@ -1,8 +1,7 @@
 from pathlib import Path
-import yaml
+from git import Optional
 import os
 import sys
-import torch
 import tyro
 from rich.console import Console
 from dataclasses import dataclass
@@ -16,7 +15,6 @@ sys.path.insert(0, parent_dir)
 
 from gssr.utils.mesh_utils import GaussianExtractor, post_process_mesh
 from gssr.utils.render_utils import generate_path, create_videos
-
 from utils import eval_setup
 
 CONSOLE = Console(width=120)
@@ -27,7 +25,8 @@ class MeshExtractor:
     """Load a gaussian-model, extract mesh"""
 
     # Path to config YAML file.
-    load_config: Path = None
+    load_config: Path = Path()
+    iterations: Optional[int] = None
     skip_train: bool = False
     skip_test: bool = False
     skip_mesh: bool = False
@@ -45,7 +44,8 @@ class MeshExtractor:
 
     def main(self, load_config=None):
         """Main function."""
-        config, scene, _ = eval_setup(config_path=load_config if load_config else self.load_config)
+        config, scene, _ = eval_setup(config_path=load_config if load_config else self.load_config, 
+                                      iterations=self.iterations, data_device=self.data_device)
         train_cams = scene.dataloader.getTrainData()
         test_cams = scene.dataloader.getTestData()
 

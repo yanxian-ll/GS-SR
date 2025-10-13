@@ -146,8 +146,8 @@ method_configs["octree-pgsr"] = Config(
 
 
 # /////////////////////////////////////////////
-method_configs["satellite-3dgs"] = Config(
-    method_name="satellite-3dgs",
+method_configs["sate-3dgs"] = Config(
+    method_name="sate-3dgs",
     scene=VanillaSceneConfig(
         dataloader=SatelliteDataLoaderConfig(),
         gaussians=VanillaGaussianConfig(),
@@ -155,8 +155,8 @@ method_configs["satellite-3dgs"] = Config(
     )
 )
 
-method_configs["satellite-2dgs"] = Config(
-    method_name="satellite-2dgs",
+method_configs["sate-2dgs"] = Config(
+    method_name="sate-2dgs",
     scene=TwoDGSSceneConfig(
         dataloader=SatelliteDataLoaderConfig(),
         gaussians=TwoDGaussianConfig(),
@@ -164,76 +164,102 @@ method_configs["satellite-2dgs"] = Config(
     )
 )
 
-method_configs["satellite-pgsr"] = Config(
-    method_name="satellite-pgsr",
+method_configs["sate-pgsr"] = Config(
+    method_name="sate-pgsr",
     scene=PGSRSceneConfig(
         dataloader=SatelliteDataLoaderConfig(),
         gaussians=PGSRGaussianConfig(),
     )
 )
 
-
-### Our method
-from gssr.gaussian.satellite_scaffold_gaussian import SatelliteScaffoldGaussianConfig
-from gssr.scene.satellite_scaffold_scene import SatelliteScaffoldSceneConfig
-from gssr.scene.satellite_scaffold_2dgs_scene import SatelliteScaffold2DGSSceneConfig
-
-method_configs["satellite-scaffold-gs"] = Config(
-    method_name="satellite-scaffold-gs",
-    scene=SatelliteScaffoldSceneConfig(
+method_configs["sate-scaffold-3dgs"] = Config(
+    method_name="sate-scaffold-3dgs",
+    scene=ScaffoldSceneConfig(
         dataloader=SatelliteDataLoaderConfig(),
-        gaussians=SatelliteScaffoldGaussianConfig(
-            
-            add_opacity_dist = False,
-            add_cov_dist = False,
-            add_color_dist = False,
-        ),
-        lambda_scaling = 0.01,
-    ),
+        gaussians=ScaffoldGaussianConfig(),
+        lambda_dssim=0.2
+    )
 )
 
-
-method_configs["satellite-scaffold-2dgs"] = Config(
-    method_name="satellite-scaffold-2dgs",
-    scene=SatelliteScaffold2DGSSceneConfig(
+method_configs["sate-scaffold-2dgs"] = Config(
+    method_name="sate-scaffold-2dgs",
+    scene=Scaffold2DGSSceneConfig(
         dataloader=SatelliteDataLoaderConfig(),
-        gaussians=SatelliteScaffoldGaussianConfig(
-            
-            add_opacity_dist = False,
-            add_cov_dist = False,
-            add_color_dist = False,
-        ),
-        lambda_scaling = 0.01,
-    ),
+        gaussians=ScaffoldGaussianConfig(),
+        lambda_normal = 0.05,
+    )
 )
 
-method_configs["satellite-scaffold-pgsr"] = Config(
-    method_name="satellite-scaffold-pgsr",
+method_configs["sate-scaffold-pgsr"] = Config(
+    method_name="sate-scaffold-pgsr",
     scene=ScaffoldPGSRSceneConfig(
         dataloader=SatelliteDataLoaderConfig(),
-        gaussians=ScaffoldGaussianConfig(
-            
-            add_opacity_dist = False,
-            add_cov_dist = False,
-            add_color_dist = False,
-        ),
-        lambda_scaling = 0.01,
-    ),
+        gaussians=ScaffoldGaussianConfig()
+    )
 )
 
-method_configs["satellite-octree-2dgs"] = Config(
-    method_name="satellite-octree-2dgs",
-    scene=Octree2DGSSceneConfig(
-        dataloader=SatelliteDataLoaderConfig(),
-        gaussians=OctreeGaussianConfig(
+
+# ### Our method
+# from gssr.gaussian.satellite_scaffold_gaussian import SatelliteScaffoldGaussianConfig
+# from gssr.scene.satellite_scaffold_scene import SatelliteScaffoldSceneConfig
+# from gssr.scene.satellite_scaffold_2dgs_scene import SatelliteScaffold2DGSSceneConfig
+
+# method_configs["satellite-scaffold-gs"] = Config(
+#     method_name="satellite-scaffold-gs",
+#     scene=SatelliteScaffoldSceneConfig(
+#         dataloader=SatelliteDataLoaderConfig(),
+#         gaussians=SatelliteScaffoldGaussianConfig(
             
-            add_opacity_dist = False,
-            add_cov_dist = False,
-            add_color_dist = False,
-        ),
-        lambda_scaling = 0.01,
-    ),
-)
+#             add_opacity_dist = False,
+#             add_cov_dist = False,
+#             add_color_dist = False,
+#         ),
+#         lambda_scaling = 0.01,
+#     ),
+# )
+
+
+# method_configs["satellite-scaffold-2dgs"] = Config(
+#     method_name="satellite-scaffold-2dgs",
+#     scene=SatelliteScaffold2DGSSceneConfig(
+#         dataloader=SatelliteDataLoaderConfig(),
+#         gaussians=SatelliteScaffoldGaussianConfig(
+            
+#             add_opacity_dist = False,
+#             add_cov_dist = False,
+#             add_color_dist = False,
+#         ),
+#         lambda_scaling = 0.01,
+#     ),
+# )
+
+# method_configs["satellite-scaffold-pgsr"] = Config(
+#     method_name="satellite-scaffold-pgsr",
+#     scene=ScaffoldPGSRSceneConfig(
+#         dataloader=SatelliteDataLoaderConfig(),
+#         gaussians=ScaffoldGaussianConfig(
+            
+#             add_opacity_dist = False,
+#             add_cov_dist = False,
+#             add_color_dist = False,
+#         ),
+#         lambda_scaling = 0.01,
+#     ),
+# )
+
+# method_configs["satellite-octree-2dgs"] = Config(
+#     method_name="satellite-octree-2dgs",
+#     scene=Octree2DGSSceneConfig(
+#         dataloader=SatelliteDataLoaderConfig(),
+#         gaussians=OctreeGaussianConfig(
+            
+#             add_opacity_dist = False,
+#             add_cov_dist = False,
+#             add_color_dist = False,
+#         ),
+#         lambda_scaling = 0.01,
+#     ),
+# )
 
 AnnotatedBaseConfigUnion = tyro.conf.SuppressFixed[  # Don't show unparseable (fixed) arguments in helptext.
     tyro.conf.FlagConversionOff[

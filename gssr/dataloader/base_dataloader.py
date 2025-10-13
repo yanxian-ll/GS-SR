@@ -21,7 +21,6 @@ class DataLoaderConfig(cfg.InstantiateConfig):
     resolution: int = -1
     white_background: bool = False
 
-
 class DataLoader(nn.Module):
     config: DataLoaderConfig
     def __init__(
