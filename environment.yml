@@ -1,45 +1,66 @@
+# Linux x86-64 / GCC 11. Run from GS-SR so pip can find ./submodules.
+# Local extensions must compile against this environment's CUDA 11.8:
+# CUDA_HOME="$(conda info --base)/envs/gssr" conda env create -f environment.yml
+# Existing environment: use `conda env update -n gssr -f environment.yml` instead.
 name: gssr
 channels:
   - pytorch
+  - nvidia
+  - pytorch3d
   - pyg
   - conda-forge
   - defaults
 dependencies:
-  - cudatoolkit=11.8
   - python=3.8.19
   - pip=24.2
-  - pytorch=2.1.2
-  - torchaudio=2.1.2
-  - torchvision=0.16.2
-  - pytorch-scatter
+  - setuptools=69.5.1
+  - wheel
+  - ninja
+  # cudatoolkit alone does NOT force the CUDA build of PyTorch.
+  - pytorch::pytorch=2.1.2=py3.8_cuda11.8*
+  - pytorch::torchvision=0.16.2=py38_cu118*
+  - pytorch::torchaudio=2.1.2=py38_cu118*
+  - pytorch::pytorch-cuda=11.8
+  - pytorch::pytorch-mutex=1.0=cuda
+  # Includes nvcc and development headers for the five local CUDA extensions.
+  - nvidia::cuda-toolkit=11.8
+  - pytorch3d::pytorch3d=0.7.8=py38_cu118_pyt212
+  - pyg::pytorch-scatter=2.1.2=py38_torch_2.1.0_cu118
+  - numpy=1.24.4
+  # Avoid newer MKL releases incompatible with this older PyTorch build.
+  - mkl<2024.1
   - pip:
-    - plyfile
-    - tensorboard
-    - tqdm
-    - einops
-    - wandb
-    - lpips
-    - laspy
-    - jaxtyping
-    - colorama
-    - opencv-python
-    - sklearn
-    - trimesh
-    - open3d
-    - pytorch3d
-    - matplotlib
-    - mediapy
-    - opencv_python
-    - Pillow
-    - PyYAML
-    - rich
-    - scipy
-    - Shapely
-    - skimage
-    - tyro
-    - submodules/diff-gaussian-rasterization
-    - submodules/diff-plane-rasterization
-    - submodules/diff-surfel-rasterization
-    - submodules/scaffold-filter
-    - submodules/simple-knn
-    
+    - plyfile==1.0.3
+    - tensorboard==2.14.0
+    - tqdm>=4.66,<5
+    - einops==0.8.1
+    - wandb>=0.16,<0.18
+    - lpips==0.1.4
+    - laspy==2.5.4
+    - jaxtyping==0.2.19
+    - torchtyping==0.1.5
+    - colorama==0.4.6
+    - opencv-python==4.10.0.84
+    - scikit-learn==1.3.2
+    - scikit-image==0.21.0
+    - trimesh>=4,<4.6
+    - open3d==0.19.0
+    - matplotlib==3.7.5
+    - mediapy==1.2.4
+    - Pillow==10.4.0
+    - PyYAML==6.0.2
+    - rich==14.2.0
+    - scipy==1.10.1
+    - Shapely==2.0.7
+    - tyro==0.9.1
+    - numba==0.58.1
+    - GitPython==3.1.43
+    - rasterio==1.3.11
+    - pyproj==3.5.0
+    - affine==2.4.0
+    # Requires the submodule sources and a working GCC/G++ toolchain.
+    - ./submodules/diff-gaussian-rasterization
+    - ./submodules/diff-plane-rasterization
+    - ./submodules/diff-surfel-rasterization
+    - ./submodules/scaffold-filter
+    - ./submodules/simple-knn

@@ -48,8 +48,15 @@ cd GS-SR
 2. Install dependencies
 
 ```bash
-conda env create --file environment.yml
+# Run inside GS-SR; local pip packages use ./submodules paths.
+CUDA_HOME="$(conda info --base)/envs/gssr" conda env create --file environment.yml
 conda activate gssr
+
+# For an existing, incomplete gssr environment, use this instead of create:
+# CUDA_HOME="$(conda info --base)/envs/gssr" conda env update -n gssr --file environment.yml
+
+python -c "import torch; print(torch.__version__, torch.version.cuda, torch.cuda.is_available())"
+python train.py scaffold-2dgs --help
 ```
 
 ## Usage
