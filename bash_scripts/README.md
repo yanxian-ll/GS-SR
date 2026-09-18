@@ -4,10 +4,14 @@
 
 - `train_scaffold-2dgs.sh`
 - `train_scaffold-pgsr.sh`
+- `train_scaffold-2dgs-7k.sh`
+- `train_scaffold-pgsr-7k.sh`
 - `train_2dgs.sh`
 - `train_pgsr.sh`
 
 `_train_common.sh` 提供公共启动逻辑，无需直接运行。脚本自动定位工作区和 GS-SR，不依赖启动时所在目录。默认 `xiaoxiang_03/003`、GPU 0、30000 步、原图分辨率、全部图像参与训练；直接使用 COLMAP 稀疏点初始化。
+
+其中两个 `*-7k.sh` 是对应 Scaffold 方法的 7000 步入口，默认 `RUN_NAME=pipeline-7k`，其余方法参数与对应 30k 脚本保持一致。因此它们等价于把原 30k 配置截断到第 7000 步，不会自动压缩 normal loss、multi-view loss、densification 或 learning-rate schedule 的起止步数。
 
 ## 运行
 
@@ -17,16 +21,19 @@
 conda activate 3dgs
 bash bash_scripts/train_scaffold-2dgs.sh
 bash bash_scripts/train_scaffold-pgsr.sh
+bash bash_scripts/train_scaffold-2dgs-7k.sh
+bash bash_scripts/train_scaffold-pgsr-7k.sh
 bash bash_scripts/train_2dgs.sh
 bash bash_scripts/train_pgsr.sh
 ```
 
-上述为四条独立的完整训练命令。单 GPU 建议依次运行。
+上述为六条独立训练命令。单 GPU 建议依次运行。
 
 先检查命令，不训练、不修改数据：
 
 ```bash
 bash bash_scripts/train_scaffold-pgsr.sh --dry-run
+bash bash_scripts/train_scaffold-pgsr-7k.sh --dry-run
 ```
 
 切换场景、视角数与常用参数：
@@ -34,6 +41,8 @@ bash bash_scripts/train_scaffold-pgsr.sh --dry-run
 ```bash
 SCENE=xiaoxiang_03 VIEWS=005 GPU=0 bash bash_scripts/train_2dgs.sh
 SCENE=xiaoxiang_03 VIEWS=010 RESOLUTION=2 bash bash_scripts/train_scaffold-pgsr.sh
+SCENE=xiaoxiang_03 VIEWS=003 GPU=0 bash bash_scripts/train_scaffold-2dgs-7k.sh
+SCENE=xiaoxiang_03 VIEWS=005 GPU=1 bash bash_scripts/train_scaffold-pgsr-7k.sh
 ITERATIONS=1000 SAVE_ITERATIONS=500 bash bash_scripts/train_scaffold-2dgs.sh
 ```
 
@@ -67,4 +76,4 @@ python script/extract_mesh.py \
   --skip-video
 ```
 
-四个入口已通过 Bash 语法、dry-run 和实际 GS-SR 参数解析检查；没有自动启动完整训练。
+四个原始入口已通过 Bash 语法、dry-run 和实际 GS-SR 参数解析检查；新增 7k 入口复用对应原始 Scaffold 脚本与 `_train_common.sh` 的启动逻辑。
