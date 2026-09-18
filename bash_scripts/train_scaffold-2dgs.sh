@@ -40,9 +40,25 @@ METHOD_ARGS=()
 VOXEL_SIZE="${VOXEL_SIZE:-0.0}"          # <=0 根据点间距自动确定
 N_OFFSETS="${N_OFFSETS:-10}"
 APPEARANCE_DIM="${APPEARANCE_DIM:-32}"
+START_STAT="${START_STAT:-500}"
+DENSIFY_FROM_ITER="${DENSIFY_FROM_ITER:-1500}"
+DENSIFY_UNTIL_ITER="${DENSIFY_UNTIL_ITER:-15000}"
+DENSIFICATION_INTERVAL="${DENSIFICATION_INTERVAL:-100}"
+LR_MAX_STEPS="${LR_MAX_STEPS:-30000}"    # Scaffold offset/MLP/appearance LR 的衰减终点
 METHOD_ARGS+=(--scene.gaussians.voxel-size "$VOXEL_SIZE"
               --scene.gaussians.n-offsets "$N_OFFSETS"
-              --scene.gaussians.appearance-dim "$APPEARANCE_DIM")
+              --scene.gaussians.appearance-dim "$APPEARANCE_DIM"
+              --scene.gaussians.start-stat "$START_STAT"
+              --scene.gaussians.densify-from-iter "$DENSIFY_FROM_ITER"
+              --scene.gaussians.densify-until-iter "$DENSIFY_UNTIL_ITER"
+              --scene.gaussians.densification-interval "$DENSIFICATION_INTERVAL"
+              --scene.gaussians.position-lr-max-steps "$LR_MAX_STEPS"
+              --scene.gaussians.offset-lr-max-steps "$LR_MAX_STEPS"
+              --scene.gaussians.mlp-opacity-lr-max-steps "$LR_MAX_STEPS"
+              --scene.gaussians.mlp-cov-lr-max-steps "$LR_MAX_STEPS"
+              --scene.gaussians.mlp-color-lr-max-steps "$LR_MAX_STEPS"
+              --scene.gaussians.mlp-featurebank-lr-max-steps "$LR_MAX_STEPS"
+              --scene.gaussians.appearance-lr-max-steps "$LR_MAX_STEPS")
 METHOD_ARGS+=(--scene.lambda-normal "$LAMBDA_NORMAL" --scene.lambda-dist "$LAMBDA_DIST"
               --scene.depth-ratio "$DEPTH_RATIO" --scene.start-normal-loss-iter "$START_NORMAL_LOSS"
               --scene.satrt-dist-loss-iter "$START_DIST_LOSS") # satrt 是仓库原参数拼写
