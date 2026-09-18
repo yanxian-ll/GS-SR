@@ -11,7 +11,33 @@
 
 `_train_common.sh` 提供公共启动逻辑，无需直接运行。脚本自动定位工作区和 GS-SR，不依赖启动时所在目录。默认 `xiaoxiang_03/003`、GPU 0、30000 步、原图分辨率、全部图像参与训练；直接使用 COLMAP 稀疏点初始化。
 
-其中两个 `*-7k.sh` 是对应 Scaffold 方法的 7000 步入口，默认 `RUN_NAME=pipeline-7k`，其余方法参数与对应 30k 脚本保持一致。因此它们等价于把原 30k 配置截断到第 7000 步，不会自动压缩 normal loss、multi-view loss、densification 或 learning-rate schedule 的起止步数。
+两个 `*-7k.sh` 不是简单截断 30k，而是把 Scaffold 的结构调整、主要 learning-rate decay 以及对应几何 regularization 的启动时刻一起压缩到 7000 步预算。损失权重、voxel size、offset 数量、appearance dimension 等模型超参数保持与 30k 一致，只改变与训练时间尺度直接相关的参数。
+
+## 7k schedule
+
+7k schedule 以保持 30k 配置中的相对训练进度为原则：
+
+| 参数 | 30k | 7k |
+|---|---:|---:|
+| `ITERATIONS` | 30000 | 7000 |
+| `START_STAT` | 500 | 120 |
+| `DENSIFY_FROM_ITER` | 1500 | 350 |
+| `DENSIFICATION_INTERVAL` | 100 | 25 |
+| `DENSIFY_UNTIL_ITER` | 15000 | 3500 |
+| `LR_MAX_STEPS` | 30000 | 7000 |
+| 2DGS `START_DIST_LOSS` | 3000 | 700 |
+| 2DGS `START_NORMAL_LOSS` | 7000 | 1600 |
+| PGSR `START_SINGLE_VIEW` | 3000 | 700 |
+| PGSR `START_MULTI_VIEW` | 3000 | 700 |
+
+这样 densification 仍大致占前半段训练，后半段用于固定结构后的外观与几何收敛；Scaffold 的 offset/MLP/appearance exponential LR decay 也会在 7k 结束时走完，而不是停留在 30k schedule 的早期学习率。
+
+所有这些参数仍可通过环境变量覆盖，例如：
+
+```bash
+DENSIFICATION_INTERVAL=50 DENSIFY_UNTIL_ITER=4000 \
+  bash bash_scripts/train_scaffold-pgsr-7k.sh
+```
 
 ## 运行
 
@@ -46,7 +72,7 @@ SCENE=xiaoxiang_03 VIEWS=005 GPU=1 bash bash_scripts/train_scaffold-pgsr-7k.sh
 ITERATIONS=1000 SAVE_ITERATIONS=500 bash bash_scripts/train_scaffold-2dgs.sh
 ```
 
-较短训练仅用于检查启动；损失与增密阶段仍按脚本配置的起始步数启用，不会随总迭代自动缩短。
+普通 30k Scaffold 入口仍使用原仓库时间尺度；两个专用 7k 入口会自动覆盖为上表 schedule。若直接给普通入口设置较短 `ITERATIONS`，schedule 不会自动缩放，应同时显式覆盖相应时间参数，或直接使用 `*-7k.sh`。
 
 自定义数据路径和实验名：
 
@@ -76,4 +102,4 @@ python script/extract_mesh.py \
   --skip-video
 ```
 
-四个原始入口已通过 Bash 语法、dry-run 和实际 GS-SR 参数解析检查；新增 7k 入口复用对应原始 Scaffold 脚本与 `_train_common.sh` 的启动逻辑。
+30k 入口保留原默认行为；7k 入口复用同一训练与 mesh 管线，仅覆盖训练预算相关 schedule。
