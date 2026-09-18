@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Scaffold-2DGS 7k 训练入口：按 7k/30k 的相对训练进度压缩 loss、densification 与 LR schedule。
+# Scaffold-2DGS 7k 训练入口：面向 UAV/户外表面重建，压缩 schedule 并启用 2DGS distortion regularization。
 set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -9,7 +9,10 @@ export RUN_NAME="${RUN_NAME:-pipeline-7k}"
 export SAVE_ITERATIONS="${SAVE_ITERATIONS:-7000}"
 export TEST_ITERATIONS="${TEST_ITERATIONS:-7000}"
 
-# ===== 2DGS regularization schedule =====
+# ===== 2DGS geometry regularization =====
+# 通用 30k 脚本保留仓库默认 LAMBDA_DIST=0；7k surface profile 默认启用 distortion。
+# 仓库 TNT outdoor/360 评测使用 100，大场景使用 10；UAV 默认先取 100，可通过环境变量覆盖。
+export LAMBDA_DIST="${LAMBDA_DIST:-100}"
 # 30k: dist 3000 (10%), normal 7000 (23.3%)
 # 7k : dist  700 (10%), normal 1600 (~22.9%)
 export START_DIST_LOSS="${START_DIST_LOSS:-700}"
