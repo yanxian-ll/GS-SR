@@ -11,7 +11,7 @@
 
 `_train_common.sh` 提供公共启动逻辑，无需直接运行。脚本自动定位工作区和 GS-SR，不依赖启动时所在目录。默认 `xiaoxiang_03/003`、GPU 0、30000 步、原图分辨率、全部图像参与训练；直接使用 COLMAP 稀疏点初始化。
 
-两个 `*-7k.sh` 不是简单截断 30k，而是把 Scaffold 的结构调整、主要 learning-rate decay 以及对应几何 regularization 的启动时刻一起压缩到 7000 步预算。损失权重、voxel size、offset 数量、appearance dimension 等模型超参数保持与 30k 一致，只改变与训练时间尺度直接相关的参数。
+两个 `*-7k.sh` 不是简单截断 30k，而是把 Scaffold 的结构调整、主要 learning-rate decay 以及对应几何 regularization 的启动时刻一起压缩到 7000 步预算。`scaffold-pgsr-7k` 保持原 PGSR loss 权重；`scaffold-2dgs-7k` 作为 UAV/户外表面重建 profile，额外默认启用 `LAMBDA_DIST=100`。voxel size、offset 数量、appearance dimension 等其余模型参数保持原值，且都可通过环境变量覆盖。
 
 ## 7k schedule
 
@@ -27,16 +27,19 @@
 | `LR_MAX_STEPS` | 30000 | 7000 |
 | 2DGS `START_DIST_LOSS` | 3000 | 700 |
 | 2DGS `START_NORMAL_LOSS` | 7000 | 1600 |
+| 2DGS `LAMBDA_DIST` | 0 (通用脚本默认) | 100 (7k surface profile) |
 | PGSR `START_SINGLE_VIEW` | 3000 | 700 |
 | PGSR `START_MULTI_VIEW` | 3000 | 700 |
 
-这样 densification 仍大致占前半段训练，后半段用于固定结构后的外观与几何收敛；Scaffold 的 offset/MLP/appearance exponential LR decay 也会在 7k 结束时走完，而不是停留在 30k schedule 的早期学习率。
+这样 densification 仍大致占前半段训练，后半段用于固定结构后的外观与几何收敛；Scaffold 的 offset/MLP/appearance exponential LR decay 也会在 7k 结束时走完，而不是停留在 30k schedule 的早期学习率。仓库 TNT 评测中 2DGS distortion 权重对 outdoor/360 场景使用 100、对 large 场景使用 10，因此超大 UAV 场景可优先尝试 `LAMBDA_DIST=10`。
 
 所有这些参数仍可通过环境变量覆盖，例如：
 
 ```bash
 DENSIFICATION_INTERVAL=50 DENSIFY_UNTIL_ITER=4000 \
   bash bash_scripts/train_scaffold-pgsr-7k.sh
+
+LAMBDA_DIST=10 bash bash_scripts/train_scaffold-2dgs-7k.sh
 ```
 
 ## 运行
@@ -102,4 +105,4 @@ python script/extract_mesh.py \
   --skip-video
 ```
 
-30k 入口保留原默认行为；7k 入口复用同一训练与 mesh 管线，仅覆盖训练预算相关 schedule。
+30k 入口保留原默认行为；7k 入口复用同一训练与 mesh 管线，并覆盖训练预算相关 schedule。`scaffold-2dgs-7k` 另外启用 surface-oriented distortion regularization。
