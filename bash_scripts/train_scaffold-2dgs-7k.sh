@@ -6,4 +6,4 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 export ITERATIONS="${ITERATIONS:-7000}"
 export RUN_NAME="${RUN_NAME:-pipeline-7k}"
 
-exec "$SCRIPT_DIR/train_scaffold-2dgs.sh" "$@"
+exec bash "$SCRIPT_DIR/train_scaffold-2dgs.sh" "$@"
