@@ -41,6 +41,11 @@ class PGSRDataLoader(ColmapDataLoader):
 
         if self.config.depth_init_dir:
             train_image_names = [cam.image_name for cam in self.getTrainData()]
+            scene_scale = 1.0 if self.config.scene_scale is None else float(self.config.scene_scale)
+            scene_translation = tuple(
+                0.0 if value is None else float(value)
+                for value in (self.config.t_x, self.config.t_y, self.config.t_z)
+            )
             self.point_cloud, depth_stats = load_murre_depth_point_cloud(
                 source_dir=self.source_dir,
                 depth_dir=self.config.depth_init_dir,
@@ -48,17 +53,13 @@ class PGSRDataLoader(ColmapDataLoader):
                 num_points=self.config.depth_init_num_points,
                 seed=self.config.depth_init_seed,
                 scale_scene=self.config.scale_scene,
-                scene_scale=float(self.config.scene_scale),
-                scene_translation=(
-                    float(self.config.t_x),
-                    float(self.config.t_y),
-                    float(self.config.t_z),
-                ),
+                scene_scale=scene_scale,
+                scene_translation=scene_translation,
                 depth_min=self.config.depth_init_min_depth,
                 depth_max=self.config.depth_init_max_depth,
             )
             CONSOLE.log(
-                "Depth-prior initialization: "
+                "Depth-prior initialization replaces SfM points: "
                 f"{depth_stats.num_frames} train views, "
                 f"{depth_stats.num_valid_points} valid depth points -> "
                 f"{depth_stats.num_sampled_points} sampled points "
