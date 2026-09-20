@@ -38,6 +38,25 @@ DEPTH_TRUNC="${DEPTH_TRUNC:--1}"
 SDF_TRUNC="${SDF_TRUNC:--1}"
 NUM_CLUSTER="${NUM_CLUSTER:-50}"
 METHOD_ARGS=()
+
+# ===== 可选 Murre dense-depth 初始化 =====
+# 默认关闭，保持原来的 SfM 初始化。启用示例：
+# DEPTH_INIT_DIR=murre_depth DEPTH_INIT_NUM_POINTS=100000 bash bash_scripts/train_scaffold-pgsr.sh
+DEPTH_INIT_DIR="${DEPTH_INIT_DIR:-}"
+DEPTH_INIT_NUM_POINTS="${DEPTH_INIT_NUM_POINTS:-100000}"
+DEPTH_INIT_SEED="${DEPTH_INIT_SEED:-$SEED}"
+DEPTH_INIT_MIN_DEPTH="${DEPTH_INIT_MIN_DEPTH:-1e-6}"
+DEPTH_INIT_MAX_DEPTH="${DEPTH_INIT_MAX_DEPTH:-}"
+if [[ -n "$DEPTH_INIT_DIR" ]]; then
+    METHOD_ARGS+=(--scene.dataloader.depth-init-dir "$DEPTH_INIT_DIR"
+                 --scene.dataloader.depth-init-num-points "$DEPTH_INIT_NUM_POINTS"
+                 --scene.dataloader.depth-init-seed "$DEPTH_INIT_SEED"
+                 --scene.dataloader.depth-init-min-depth "$DEPTH_INIT_MIN_DEPTH")
+    if [[ -n "$DEPTH_INIT_MAX_DEPTH" ]]; then
+        METHOD_ARGS+=(--scene.dataloader.depth-init-max-depth "$DEPTH_INIT_MAX_DEPTH")
+    fi
+fi
+
 # ===== Scaffold 参数 =====
 VOXEL_SIZE="${VOXEL_SIZE:-0.0}"          # <=0 根据点间距自动确定
 N_OFFSETS="${N_OFFSETS:-10}"
