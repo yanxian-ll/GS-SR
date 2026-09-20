@@ -2,13 +2,15 @@ import os
 import numpy as np
 import torch
 from dataclasses import dataclass, field
-from typing import Type
+from typing import Optional, Type
 
 from gssr.dataloader.colmap_dataloader import ColmapDataLoader, ColmapDataLoaderConfig
+from gssr.dataloader.depth_prior import load_murre_depth_point_cloud
 from gssr.utils.mvsnet_utils import read_pairs, write_pairs, read_model, qvec2rotmat, view_selection
 
 from rich.console import Console
 CONSOLE = Console(width=120)
+
 
 @dataclass
 class PGSRDataLoaderConfig(ColmapDataLoaderConfig):
@@ -19,14 +21,51 @@ class PGSRDataLoaderConfig(ColmapDataLoaderConfig):
     multi_view_min_dis: float = 0.01
     multi_view_max_dis: float = 1.5
 
+    # Optional dense depth prior for initialization. Disabled by default so the
+    # original SfM point-cloud initialization remains unchanged.
+    depth_init_dir: Optional[str] = None
+    """Murre depth directory, relative to source_dir or absolute. Example: murre_depth."""
+    depth_init_num_points: int = 100_000
+    """Uniformly sample this many valid depth-derived 3D points; <=0 keeps all."""
+    depth_init_seed: int = 0
+    depth_init_min_depth: float = 1e-6
+    depth_init_max_depth: Optional[float] = None
+    """Optional camera-Z cutoff in original COLMAP units; None uses Murre manifest max_depth."""
+
 
 class PGSRDataLoader(ColmapDataLoader):
     config: PGSRDataLoaderConfig
 
-    def __init__(self, config: ColmapDataLoaderConfig, source_dir: str, eval: bool = False, world_size: int = 1, local_rank: int = 0):
+    def __init__(self, config: PGSRDataLoaderConfig, source_dir: str, eval: bool = False, world_size: int = 1, local_rank: int = 0):
         super().__init__(config, source_dir, eval, world_size, local_rank)
 
-        ## View Selection 
+        if self.config.depth_init_dir:
+            train_image_names = [cam.image_name for cam in self.getTrainData()]
+            self.point_cloud, depth_stats = load_murre_depth_point_cloud(
+                source_dir=self.source_dir,
+                depth_dir=self.config.depth_init_dir,
+                train_image_names=train_image_names,
+                num_points=self.config.depth_init_num_points,
+                seed=self.config.depth_init_seed,
+                scale_scene=self.config.scale_scene,
+                scene_scale=float(self.config.scene_scale),
+                scene_translation=(
+                    float(self.config.t_x),
+                    float(self.config.t_y),
+                    float(self.config.t_z),
+                ),
+                depth_min=self.config.depth_init_min_depth,
+                depth_max=self.config.depth_init_max_depth,
+            )
+            CONSOLE.log(
+                "Depth-prior initialization: "
+                f"{depth_stats.num_frames} train views, "
+                f"{depth_stats.num_valid_points} valid depth points -> "
+                f"{depth_stats.num_sampled_points} sampled points "
+                f"from {depth_stats.depth_dir}"
+            )
+
+        ## View Selection
         self.num_multi_view = self.config.num_multi_view
         if os.path.exists(os.path.join(self.source_dir, 'pair.txt')):
             view_sel = read_pairs(os.path.join(self.source_dir, 'pair.txt'))
@@ -83,4 +122,3 @@ class PGSRDataLoader(ColmapDataLoader):
         for resolution_scale in self.config.resolution_scales:
             for i, cam in enumerate(self.train_dataset[resolution_scale]):
                 cam.near_ids = [k for k, s in view_sel[i]]
-
